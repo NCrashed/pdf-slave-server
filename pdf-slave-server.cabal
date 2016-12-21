@@ -1,0 +1,67 @@
+name:                pdf-slave-server
+version:             0.1.0.0
+synopsis:            Web service for pdf-slave tool
+description:         Please see README.md
+homepage:            https://github.com/NCrashed/pdf-slave-server#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Anton Gushcha
+maintainer:          ncrashed@gmail.com
+copyright:           2016 Anton Gushcha
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+extra-source-files:
+  README.md
+  CHANGELOG.md
+  stack.yaml
+
+library
+  hs-source-dirs:      src
+  exposed-modules:
+    Text.PDF.Slave.Server
+  default-language:    Haskell2010
+  build-depends:
+      base                     >= 4.7      && < 5
+
+  default-extensions:
+    BangPatterns
+    DeriveGeneric
+    FlexibleContexts
+    FlexibleInstances
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    OverloadedStrings
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeFamilies
+
+executable pdf-slave-server
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  build-depends:
+      base >= 4.7 && < 5
+    , pdf-slave-server
+
+  default-extensions:
+    BangPatterns
+    DeriveGeneric
+    FlexibleContexts
+    FlexibleInstances
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    OverloadedStrings
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeFamilies
