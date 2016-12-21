@@ -1,0 +1,49 @@
+name:                pdf-slave-server-api
+version:             0.1.0.0
+synopsis:            API description for pdf-slave-server
+description:         Please see README.md
+homepage:            https://github.com/ncrashed/pdf-slave-server#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Anton Gushcha
+maintainer:          ncrashed@gmail.com
+copyright:           Anton Gushcha 2016
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:
+    Text.PDF.Slave.Server.API
+  build-depends:
+      base                    >= 4.7    && < 5
+    , aeson                   >= 0.11   && < 0.12
+    , aeson-injector          >= 1.0    && < 1.1
+    , pdf-slave               >= 1.0    && < 1.1
+    , scientific              >= 0.3    && < 0.4
+    , servant                 >= 0.9    && < 0.10
+  default-language:    Haskell2010
+  default-extensions:
+    BangPatterns
+    DataKinds
+    DeriveGeneric
+    FlexibleContexts
+    FlexibleInstances
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    MultiParamTypeClasses
+    OverloadedStrings
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeFamilies
+    TypeOperators
+
+source-repository head
+  type:     git
+  location: https://github.com/ncrashed/pdf-slave-server
