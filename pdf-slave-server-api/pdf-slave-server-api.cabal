@@ -21,7 +21,7 @@ library
       base                    >= 4.7    && < 5
     , aeson                   >= 0.11   && < 0.12
     , aeson-injector          >= 1.0    && < 1.1
-    , pdf-slave               >= 1.0    && < 1.1
+    , pdf-slave-template      >= 1.1    && < 1.2
     , scientific              >= 0.3    && < 0.4
     , servant                 >= 0.9    && < 0.10
   default-language:    Haskell2010
