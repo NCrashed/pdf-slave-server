@@ -11,6 +11,7 @@ import Data.SafeCopy
 import Data.Scientific
 import Data.Sequence
 import Data.Text
+import Data.UUID
 import GHC.Generics
 import Text.PDF.Slave
 
@@ -19,15 +20,17 @@ import qualified Data.HashMap.Strict as H
 
 -- | Element of rendering queue
 data RenderItem = RenderItem {
+  renderId       :: UUID
   -- | Template to render
-  renderTemplate :: Template
+, renderTemplate :: Template
   -- | Optional input data
 , renderInput    :: Maybe Value
 } deriving (Generic)
 
-deriveSafeCopy 0 'base ''TemplateDependency
-deriveSafeCopy 0 'base ''Template
 deriveSafeCopy 0 'base ''RenderItem
+deriveSafeCopy 0 'base ''Template
+deriveSafeCopy 0 'base ''TemplateDependency
+deriveSafeCopy 0 'base ''UUID
 
 -- | Notification about finished rendering
 data Notification = Notification {
@@ -59,14 +62,10 @@ initialModel = Model {
   }
 
 -- | Register new render item in queue
-addRenderItem :: RenderItem -> Update Model Int
-addRenderItem ri = do
-  model <- get
-  let i = S.length . modelRenderQueue $ model
-  put $ model {
-      modelRenderQueue = modelRenderQueue model S.|> ri
-    }
-  return i
+addRenderItem :: RenderItem -> Update Model ()
+addRenderItem i = modify $ \model -> model {
+    modelRenderQueue = modelRenderQueue model S.|> i
+  }
 
 -- | Check if queue is not empty
 checkNextRenderItem :: Query Model Bool

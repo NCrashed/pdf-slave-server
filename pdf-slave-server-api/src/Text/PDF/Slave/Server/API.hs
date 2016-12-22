@@ -12,35 +12,36 @@ import Control.Monad (mzero)
 import Data.Aeson
 import Data.Aeson.WithField
 import Data.Monoid
-import Data.Scientific (toBoundedInteger)
-import Data.Word
+import Data.UUID (UUID)
 import GHC.Generics
 import Servant.API
 import Text.PDF.Slave.Template (Template)
+
+import qualified Data.UUID as UUID
 
 -- | Current version of API
 type PDFSlaveAPIVersion = "v1.0"
 
 -- | ID of item in rendering queue
-newtype RenderId = RenderId { unRenderId :: Word64 }
+newtype RenderId = RenderId { unRenderId :: UUID }
   deriving (Generic, Show, Eq)
 
 instance FromJSON RenderId where
-  parseJSON (Number n) = case toBoundedInteger n of
-    Nothing -> fail $ "Cannot convert too large numeric " <> show n <> " to RenderId"
+  parseJSON (String s) = case UUID.fromText s of
+    Nothing -> fail $ "Cannot parse render id " <> show s
     Just i -> return . RenderId $ i
   parseJSON _ = mzero
 
 instance ToJSON RenderId where
-  toJSON (RenderId n) = Number . fromIntegral $ n
+  toJSON (RenderId n) = String . UUID.toText $ n
 
 -- | Conversion from render id
-fromRenderId :: Integral a => RenderId -> a
-fromRenderId = fromIntegral . unRenderId
+fromRenderId :: RenderId -> UUID
+fromRenderId = unRenderId
 
 -- | Conversion to render id
-toRenderId :: Integral a => a -> RenderId
-toRenderId = RenderId . fromIntegral
+toRenderId :: UUID -> RenderId
+toRenderId = RenderId
 
 -- | Body of 'RenderTemplateEndpoint'
 data RenderRequestBody = RenderRequestBody {
