@@ -2,11 +2,16 @@ module Text.PDF.Slave.Server.DB(
     Model
   , AcidState
   , createDB
+  -- * Execution DB queries
+  , HasAcidState(..)
+  , runQuery
+  , runUpdate
   -- * Persistent entities
   , RenderItem(..)
   , Notification(..)
   -- * Queries
   , AddRenderItem(..)
+  , GetRenderQueueSize(..)
   , CheckNextRenderItem(..)
   , FetchRenderItem(..)
   ) where
@@ -34,6 +39,26 @@ createDB DatabaseConfig{..} = do
   whenJust databaseCheckpointTime $ \dt -> checkpointWorker dt db
   whenJust databaseArchiveTime $ \dt -> archiveWorker dt db
   return db
+
+-- | Describes monads that has internal acid-state storage
+class HasAcidState a m | m -> a where
+  getAcidState :: m (AcidState a)
+
+-- | Run acid-state query in monad with internal acid storage
+runQuery :: (MonadIO m, HasAcidState (EventState event) m, QueryEvent event)
+  => event -- ^ Event constructed from query with 'makeAcidic'
+  -> m (EventResult event)
+runQuery e = do
+  db <- getAcidState
+  liftIO $ query db e
+
+-- | Run acid-state update query in monad with internal acid storage
+runUpdate :: (MonadIO m, HasAcidState (EventState event) m, UpdateEvent event)
+  => event -- ^ Event constructed from query with 'makeAcidic'
+  -> m (EventResult event)
+runUpdate e = do
+  db <- getAcidState
+  liftIO $ update db e
 
 -- | Convert time internval to count of microseconds
 toMicroseconds :: NominalDiffTime -> Integer

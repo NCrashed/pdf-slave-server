@@ -47,6 +47,8 @@ data ServerConfig = ServerConfig {
 , serverDetailedLogging  :: !Bool
   -- | Database connection options
 , serverDatabaseConf     :: !DatabaseConfig
+  -- | Maximum allowed queue of templates to render
+, serverMaximumQueue     :: !(Maybe Int)
 } deriving (Generic, Show)
 
 instance FromJSON ServerConfig where
@@ -55,6 +57,7 @@ instance FromJSON ServerConfig where
     <*> o .: "port"
     <*> o .: "detailed-logging"
     <*> o .: "database"
+    <*> o .:? "max-queue-size"
   parseJSON _ = mzero
 
 readConfig :: MonadIO m => FilePath -> m ServerConfig

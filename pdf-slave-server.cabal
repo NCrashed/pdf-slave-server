@@ -30,6 +30,7 @@ library
       base                     >= 4.7      && < 5
     , acid-state               >= 0.14     && < 0.15
     , aeson                    >= 0.11     && < 0.12
+    , aeson-injector           >= 1.0      && < 1.1
     , bytestring               >= 0.10     && < 0.11
     , containers               >= 0.5      && < 0.6
     , hashable                 >= 1.2      && < 1.3

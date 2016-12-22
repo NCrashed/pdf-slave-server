@@ -7,9 +7,11 @@ module Text.PDF.Slave.Server.Monad(
   , ServerEnv(..)
   , newServerEnv
   -- * Utilities
+  , getConfig
   , module Text.PDF.Slave.Server.Util
   ) where
 
+import Control.Monad.Error.Class
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
@@ -37,7 +39,11 @@ newServerEnv cfg = do
 
 -- | Server monad that holds internal environment
 newtype ServerM a = ServerM { unServerM :: ReaderT ServerEnv (LoggingT Handler) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader ServerEnv, MonadLogger, MonadLoggerIO)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader ServerEnv
+    , MonadLogger, MonadLoggerIO, MonadError ServantErr)
+
+instance HasAcidState Model ServerM where
+  getAcidState = asks envDB
 
 -- | Execution of 'ServerM'
 runServerM :: ServerEnv -> ServerM a -> Handler a
@@ -46,3 +52,7 @@ runServerM e = runStdoutLoggingT . flip runReaderT e . unServerM
 -- | Transformation to Servant 'Handler'
 serverMtoHandler :: ServerEnv -> ServerM :~> Handler
 serverMtoHandler e = Nat (runServerM e)
+
+-- | Getting server configuration
+getConfig :: ServerM ServerConfig
+getConfig = asks envConfig

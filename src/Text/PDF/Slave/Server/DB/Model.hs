@@ -59,10 +59,14 @@ initialModel = Model {
   }
 
 -- | Register new render item in queue
-addRenderItem :: RenderItem -> Update Model ()
-addRenderItem i = modify $ \model -> model {
-    modelRenderQueue = modelRenderQueue model S.|> i
-  }
+addRenderItem :: RenderItem -> Update Model Int
+addRenderItem ri = do
+  model <- get
+  let i = S.length . modelRenderQueue $ model
+  put $ model {
+      modelRenderQueue = modelRenderQueue model S.|> ri
+    }
+  return i
 
 -- | Check if queue is not empty
 checkNextRenderItem :: Query Model Bool
@@ -71,6 +75,10 @@ checkNextRenderItem = do
   return $ case S.viewl $ modelRenderQueue model of
     EmptyL -> False
     _      -> True
+
+-- | Get current size of render queue
+getRenderQueueSize :: Query Model Int
+getRenderQueueSize = S.length <$> asks modelRenderQueue
 
 -- | Get next item from rendering queue
 fetchRenderItem :: Update Model (Maybe RenderItem)
@@ -85,9 +93,10 @@ fetchRenderItem = do
   return mi
 
 makeAcidic ''Model [
-    'fetchRenderItem
-  , 'addRenderItem
+    'addRenderItem
   , 'checkNextRenderItem
+  , 'fetchRenderItem
+  , 'getRenderQueueSize
   ]
 
 -- | ACID for aeson
