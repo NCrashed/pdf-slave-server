@@ -15,7 +15,6 @@ module Text.PDF.Slave.Server.Monad(
 
 import Control.Monad.Logger
 import Control.Monad.Reader
-import Control.Monad.Trans.Control
 import Data.Text
 import Servant.Server
 
@@ -24,26 +23,23 @@ import Text.PDF.Slave.Server.DB
 
 -- | Server private environment
 data ServerEnv = ServerEnv {
-  envConfig :: ServerConfig -- ^ Configuration used to create the server
-, envPool   :: ConnectionPool -- ^ Connection pool to DB
+  envConfig :: ServerConfig    -- ^ Configuration used to create the server
+, envDB     :: AcidState Model -- ^ Server DB
 }
 
 -- | Create new server environment
-newServerEnv :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+newServerEnv :: (MonadIO m)
   => ServerConfig -> m ServerEnv
 newServerEnv cfg = do
-  pool <- createDBPool (serverDatabaseConf cfg)
+  acid <- createDB (serverDatabaseConf cfg)
   return ServerEnv {
       envConfig = cfg
-    , envPool = pool
+    , envDB = acid
     }
 
 -- | Server monad that holds internal environment
 newtype ServerM a = ServerM { unServerM :: ReaderT ServerEnv (LoggingT Handler) a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader ServerEnv, MonadLogger, MonadLoggerIO)
-
-instance HasConnectionPool ServerM where
-  getConnectionPool = asks envPool
 
 -- | Execution of 'ServerM'
 runServerM :: ServerEnv -> ServerM a -> Handler a

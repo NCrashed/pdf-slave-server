@@ -8,34 +8,32 @@ module Text.PDF.Slave.Server.Config(
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Text
+import Data.Time
 import Data.Yaml
 import Data.Yaml.Config
 import GHC.Generics
 
 -- | Configuration for database connection
 data DatabaseConfig = DatabaseConfig {
-  -- | Name of a DB
-  databaseDatabase    :: !Text
-  -- | Host where a DB listens for connections
-, databaseHost        :: !Text
-  -- | Port where a DB listens for connections
-, databasePort        :: !Int
-  -- | DB authorisation user
-, databaseUser        :: !Text
-  -- | DB authorisation password
-, databasePassword    :: !Text
-  -- | Number of preallocated connections in pool (for each sub-pool)
-, databasePoolSize    :: !Int
+  -- | Path to acid-state storage folder
+  databasePath           :: !Text
+  -- | How often to make a checkpoint
+, databaseCheckpointTime :: !NominalDiffTime
+  -- | How often to make a archive
+, databaseArchiveTime    :: !NominalDiffTime
 } deriving (Generic, Show)
+
+-- | Helper to parse nominal diff time with default value
+parseNominalDiff :: Object -> Text -> Parser NominalDiffTime
+parseNominalDiff o label = do
+    t <- o .: label
+    return $ realToFrac (t :: Double)
 
 instance FromJSON DatabaseConfig where
   parseJSON (Object o) = do
-    databaseDatabase <- o .: "database"
-    databaseHost <- o .: "host"
-    databasePort <- o .: "port"
-    databaseUser <- o .: "user"
-    databasePassword <- o .: "password"
-    databasePoolSize <- o .: "poolSize"
+    databasePath <- o .: "path"
+    databaseCheckpointTime <- parseNominalDiff o "checkpoint-time"
+    databaseArchiveTime <- parseNominalDiff o "archive-time"
     return DatabaseConfig{..}
   parseJSON _ = mzero
 
