@@ -1,8 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Text.PDF.Slave.Server.DB.Model where
 
+import Control.Monad.Reader
 import Control.Monad.State
 import Data.Acid
 import Data.Aeson
@@ -64,6 +64,14 @@ addRenderItem i = modify $ \model -> model {
     modelRenderQueue = modelRenderQueue model S.|> i
   }
 
+-- | Check if queue is not empty
+checkNextRenderItem :: Query Model Bool
+checkNextRenderItem = do
+  model <- ask
+  return $ case S.viewl $ modelRenderQueue model of
+    EmptyL -> False
+    _      -> True
+
 -- | Get next item from rendering queue
 fetchRenderItem :: Update Model (Maybe RenderItem)
 fetchRenderItem = do
@@ -76,7 +84,11 @@ fetchRenderItem = do
     }
   return mi
 
-makeAcidic ''Model ['fetchRenderItem, 'addRenderItem]
+makeAcidic ''Model [
+    'fetchRenderItem
+  , 'addRenderItem
+  , 'checkNextRenderItem
+  ]
 
 -- | ACID for aeson
 

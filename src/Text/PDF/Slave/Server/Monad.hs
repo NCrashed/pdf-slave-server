@@ -7,19 +7,17 @@ module Text.PDF.Slave.Server.Monad(
   , ServerEnv(..)
   , newServerEnv
   -- * Utilities
-  , ffor
-  , whenJust
-  , showl
-  , showt
+  , module Text.PDF.Slave.Server.Util
   ) where
 
 import Control.Monad.Logger
 import Control.Monad.Reader
-import Data.Text
+import Control.Monad.Trans.Control
 import Servant.Server
 
 import Text.PDF.Slave.Server.Config
 import Text.PDF.Slave.Server.DB
+import Text.PDF.Slave.Server.Util
 
 -- | Server private environment
 data ServerEnv = ServerEnv {
@@ -28,7 +26,7 @@ data ServerEnv = ServerEnv {
 }
 
 -- | Create new server environment
-newServerEnv :: (MonadIO m)
+newServerEnv :: (MonadIO m, MonadBaseControl IO m)
   => ServerConfig -> m ServerEnv
 newServerEnv cfg = do
   acid <- createDB (serverDatabaseConf cfg)
@@ -48,20 +46,3 @@ runServerM e = runStdoutLoggingT . flip runReaderT e . unServerM
 -- | Transformation to Servant 'Handler'
 serverMtoHandler :: ServerEnv -> ServerM :~> Handler
 serverMtoHandler e = Nat (runServerM e)
-
--- | Fliped fmap
-ffor :: Functor f => f a -> (a -> b) -> f b
-ffor = flip fmap
-
--- | Execute applicative action only when the value is 'Just'
-whenJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
-whenJust (Just a) m = m a
-whenJust Nothing _ = pure ()
-
--- | Convert anything to log string
-showl :: Show a => a -> LogStr
-showl = toLogStr . show
-
--- | Convert anything to log string
-showt :: Show a => a -> Text
-showt = pack . show

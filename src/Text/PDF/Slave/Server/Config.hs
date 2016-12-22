@@ -18,16 +18,16 @@ data DatabaseConfig = DatabaseConfig {
   -- | Path to acid-state storage folder
   databasePath           :: !Text
   -- | How often to make a checkpoint
-, databaseCheckpointTime :: !NominalDiffTime
+, databaseCheckpointTime :: !(Maybe NominalDiffTime)
   -- | How often to make a archive
-, databaseArchiveTime    :: !NominalDiffTime
+, databaseArchiveTime    :: !(Maybe NominalDiffTime)
 } deriving (Generic, Show)
 
 -- | Helper to parse nominal diff time with default value
-parseNominalDiff :: Object -> Text -> Parser NominalDiffTime
+parseNominalDiff :: Object -> Text -> Parser (Maybe NominalDiffTime)
 parseNominalDiff o label = do
-    t <- o .: label
-    return $ realToFrac (t :: Double)
+    t :: Maybe Double <- o .:? label
+    return $ fmap realToFrac t
 
 instance FromJSON DatabaseConfig where
   parseJSON (Object o) = do
