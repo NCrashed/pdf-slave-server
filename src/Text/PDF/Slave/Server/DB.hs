@@ -21,6 +21,7 @@ module Text.PDF.Slave.Server.DB(
   , GetNotificationQueueSize(..)
   , CheckNextNotification(..)
   , FetchNotification(..)
+  , GetNotificationNextTime(..)
   ) where
 
 import Control.Concurrent.Thread.Delay
@@ -66,10 +67,6 @@ runUpdate :: (MonadIO m, HasAcidState (EventState event) m, UpdateEvent event)
 runUpdate e = do
   db <- getAcidState
   liftIO $ update db e
-
--- | Convert time internval to count of microseconds
-toMicroseconds :: NominalDiffTime -> Integer
-toMicroseconds dt = round $ (realToFrac dt :: Rational) * 1000000
 
 -- | Worker thread that creates DB checkpoints in given interval
 checkpointWorker :: (MonadIO m, MonadBaseControl IO m)

@@ -6,6 +6,7 @@ import Control.Lens
 import Data.Acid
 import Data.Aeson (Value)
 import Data.Hashable
+import Data.Ord
 import Data.SafeCopy
 import Data.Scientific
 import Data.Sequence
@@ -42,7 +43,7 @@ deriveSafeCopy 0 'base ''TemplateDependency
 
 -- | Notification about finished rendering
 data Notification = Notification {
-    -- |
+    -- | Corresponding rendering task id
     notifRenderId  :: RenderId
     -- | URL to send notification to
   , notifTarget    :: Text
@@ -123,16 +124,38 @@ addNotification :: Notification -> Update Model ()
 addNotification = addQueueItem modelNotificationQueue
 
 -- | Check if notification queue is not empty
-checkNextNotification :: Query Model Bool
-checkNextNotification = checkNextQueueItem modelNotificationQueue
+checkNextNotification :: UTCTime -- ^ Fetch only those whom 'notifNextTry' is less than the value
+  -> Query Model Bool
+checkNextNotification t = do
+  q <- view modelNotificationQueue
+  return $ case S.viewl . S.filter ((t <=) . notifNextTry) $ q of
+    EmptyL -> False
+    _      -> True
 
 -- | Get current size of notification queue
 getNotificationQueueSize :: Query Model Int
 getNotificationQueueSize = getQueueSize modelNotificationQueue
 
--- | Get next item from notification queue
-fetchNotification :: Update Model (Maybe Notification)
-fetchNotification = fetchQueueItem modelNotificationQueue
+-- | Get next item from notification queue with minimum expected deliver time
+fetchNotification :: UTCTime -- ^ Fetch only those whom 'notifNextTry' is less than the value
+  -> Update Model (Maybe Notification)
+fetchNotification t = do
+  q <- use modelNotificationQueue
+  -- first, remove notifications whose time have not come yet and sort in ascending order
+  let q' = S.sortBy (comparing notifNextTry) . S.filter ((t <=) . notifNextTry) $ q
+      (mi, qleft) = case S.viewl q' of
+        EmptyL    -> (Nothing, S.empty)
+        i S.:< is -> (Just i, is)
+  modelNotificationQueue .= qleft
+  return mi
+
+-- | Get time when next notification should be sended to client
+getNotificationNextTime :: Query Model (Maybe UTCTime)
+getNotificationNextTime = do
+  q <- view modelNotificationQueue
+  return $ case S.viewl . S.sort . fmap notifNextTry $ q of
+    EmptyL   -> Nothing
+    t S.:< _ -> Just t
 
 makeAcidic ''Model [
     'addRenderItem
@@ -143,6 +166,7 @@ makeAcidic ''Model [
   , 'checkNextNotification
   , 'getNotificationQueueSize
   , 'fetchNotification
+  , 'getNotificationNextTime
   ]
 
 -- | ACID for aeson

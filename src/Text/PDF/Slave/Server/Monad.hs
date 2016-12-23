@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Text.PDF.Slave.Server.Monad(
   -- * Monad
     ServerM
@@ -12,7 +13,9 @@ module Text.PDF.Slave.Server.Monad(
   , module Text.PDF.Slave.Server.Util
   ) where
 
+import Control.Concurrent (forkIO)
 import Control.Concurrent.STM.TChan
+import Control.Concurrent.Thread.Delay
 import Control.Monad
 import Control.Monad.Base
 import Control.Monad.Error.Class
@@ -23,12 +26,16 @@ import Control.Monad.STM
 import Control.Monad.Trans.Control
 import Data.Monoid
 import Data.Text (pack, Text)
-import Data.Time (getCurrentTime)
+import Data.Time (getCurrentTime, diffUTCTime, addUTCTime)
 import Servant.Server
+import Network.HTTP.Client
+import Network.HTTP.Client.TLS
 
 import Text.PDF.Slave
+import Text.PDF.Slave.Server.API (APINotificationBody(..), toAPIRenderId)
 import Text.PDF.Slave.Server.Config
 import Text.PDF.Slave.Server.DB
+import Text.PDF.Slave.Server.Notification
 import Text.PDF.Slave.Server.Util
 
 import qualified Control.Immortal as Immortal
@@ -42,6 +49,12 @@ data ServerEnv = ServerEnv {
 -- new value in the channel when they finished all available work from rendering
 -- queue. Thats helps to avoid polling when there is no work to do.
 , envRenderChan  :: TChan ()
+-- | Coordination channel that is pushed when new item arrived. Workers wait for
+-- new value in the channel when they finished all available work from notification
+-- queue. Thats helps to avoid polling when there is no work to do.
+, envNotificationChan  :: TChan ()
+-- | Connection manager for sending notifications
+, envManager :: Manager
 }
 
 -- | Create new server environment
@@ -50,12 +63,18 @@ newServerEnv :: (MonadIO m, MonadBaseControl IO m)
 newServerEnv cfg = do
   acid <- createDB (serverDatabaseConf cfg)
   renderChan <- liftIO newTChanIO
+  notificChan <- liftIO newTChanIO
+  mng <- liftIO $ newManager tlsManagerSettings
   let env = ServerEnv {
         envConfig = cfg
       , envDB = acid
       , envRenderChan = renderChan
+      , envNotificationChan = notificChan
+      , envManager = mng
       }
-  liftIO . runServerMIO env $ replicateM_ (serverRenderWorkers cfg) spawnRendererWorker
+  liftIO . runServerMIO env $ do
+    replicateM_ (serverRenderWorkers cfg) spawnRendererWorker
+    replicateM_ (serverNotificationWorkers cfg) spawnNotificationWorker
   return env
 
 -- | Server monad that holds internal environment
@@ -93,10 +112,16 @@ serverMtoHandler e = Nat (runServerM e)
 getConfig :: ServerM ServerConfig
 getConfig = asks envConfig
 
--- | Awake sleeping workers about that we have a work to do
+-- | Awake sleeping workers when we have a work to do
 emitRenderItem :: ServerM ()
 emitRenderItem = do
   chan <- asks envRenderChan
+  liftIO . atomically $ writeTChan chan ()
+
+-- | Awake sleeping workers when we have a work to do
+emitNotificationItem :: ServerM ()
+emitNotificationItem = do
+  chan <- asks envNotificationChan
   liftIO . atomically $ writeTChan chan ()
 
 -- | Spawn a worker that reads next available render task from queue and executes it
@@ -140,3 +165,79 @@ registerNotification RenderItem{..} res = do
         , notifNextTry = t
         }
   runUpdate . AddNotification $ notification
+  emitNotificationItem -- awake notification workers
+
+-- | Spawn a worker that waits for notifications and tries to deliver them.
+spawnNotificationWorker :: ServerM ()
+spawnNotificationWorker = void . Immortal.createWithLabel "rendererWorker" $ const work
+  where
+    work = do
+      t <- liftIO getCurrentTime
+      hasWork <- runQuery $ CheckNextNotification t
+      if hasWork then do
+          mitem <- runUpdate $ FetchNotification t
+          case mitem of
+            Nothing -> work
+            Just notification -> do
+              mnotification <- deliverNotification notification
+              whenJust mnotification $ runUpdate . AddNotification
+              work
+        else sleep
+
+    sleep = do
+      chan <- asks envNotificationChan
+      -- run thread that will awake the worker when next notification is ready
+      mt <- runQuery GetNotificationNextTime
+      whenJust mt $ \t -> void . liftIO . forkIO $ do
+        curTime <- getCurrentTime
+        delay . toMicroseconds $ diffUTCTime t curTime
+        atomically $ writeTChan chan ()
+      -- wait for new notifications
+      _ <- liftIO . atomically $ readTChan chan
+      work
+
+-- | Try to send notification to client, if failed, delay notification for additional
+-- try. If maximum count of tries is hit, the notification is deleted.
+deliverNotification :: Notification -> ServerM (Maybe Notification)
+deliverNotification n@Notification{..} = do
+  let body = APINotificationBody {
+          apiNotificationId = toAPIRenderId . unRenderId $ notifRenderId
+        , apiNotificationError = either Just (const Nothing) notifDocument
+        , apiNotificationDocument = either (const Nothing) Just notifDocument
+        }
+  mng <- asks envManager
+  res <- postNotification mng notifTarget body
+  case res of
+    Left (BadBaseUrl e) -> do
+      $logError $ "Notification for " <> showt notifRenderId
+        <> " is failed, wrong url " <> notifTarget <> ": " <> showt e
+      return Nothing
+    Left HasRedirectError -> do
+      $logError $ "Notification for " <> showt notifRenderId
+        <> " is failed, forbidden redirections"
+      return Nothing
+    Left (WrongSuccessStatus s) -> do
+      $logWarn $ "Notification for " <> showt notifRenderId
+        <> " is succeded, but returned strage status " <> showt s
+      return Nothing
+    Left (NotificationFail e) -> do
+      $logWarn $ "Notification for " <> showt notifRenderId
+        <> " is failed, reason: " <> showt e <> ", will retry later."
+      ServerConfig{..} <- asks envConfig
+      case (notifTries >=) <$> serverMaxNotificationTries of
+        Just True -> do
+          $logError $ "Notification for " <> showt notifRenderId
+            <> " is not delivered! Maximum count of tries is hit."
+          return Nothing
+        _ -> do
+          t <- liftIO getCurrentTime
+          let n' = n {
+                  notifTries = notifTries + 1
+                , notifLastError = Just $ showt e
+                , notifNextTry = serverNotificationDelay `addUTCTime` t
+                }
+          return $ Just n'
+    Right () -> do
+      $logInfo $ "Notification for " <> showt notifRenderId
+        <> " is succeded!"
+      return Nothing

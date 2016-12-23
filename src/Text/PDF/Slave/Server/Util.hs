@@ -3,10 +3,12 @@ module Text.PDF.Slave.Server.Util(
   , whenJust
   , showl
   , showt
+  , toMicroseconds
   ) where
 
 import Control.Monad.Logger
 import Data.Text
+import Data.Time
 
 -- | Fliped fmap
 ffor :: Functor f => f a -> (a -> b) -> f b
@@ -24,3 +26,7 @@ showl = toLogStr . show
 -- | Convert anything to log string
 showt :: Show a => a -> Text
 showt = pack . show
+
+-- | Convert time internval to count of microseconds
+toMicroseconds :: NominalDiffTime -> Integer
+toMicroseconds dt = round $ (realToFrac dt :: Rational) * 1000000
