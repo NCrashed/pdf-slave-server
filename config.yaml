@@ -1,0 +1,12 @@
+host: localhost
+port: 3001
+detailed-logging: true
+database:
+  path: ./
+  checkpoint-time: 600 # each 10 minutes
+  archive-time: 86400 # 1 day
+max-queue-size: 100
+render-workers: 1
+notification-workers: 1
+notification-delay: 30 # each 30 seconds try to deliver
+notification-tries: 5 # try 5 times then throw away results
