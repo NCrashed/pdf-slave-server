@@ -2,7 +2,7 @@ host: localhost
 port: 3001
 detailed-logging: true
 database:
-  path: ./
+  path: ./state
   checkpoint-time: 600 # each 10 minutes
   archive-time: 86400 # 1 day
 max-queue-size: 100

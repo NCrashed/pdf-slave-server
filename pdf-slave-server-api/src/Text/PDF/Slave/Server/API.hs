@@ -7,6 +7,10 @@ module Text.PDF.Slave.Server.API(
   , toAPIRenderId
   , APIRenderBody(..)
   , APINotificationBody(..)
+  -- * Reexports
+  , OnlyField(..)
+  , OnlyId
+  , Template
   ) where
 
 import Control.Monad (mzero)
