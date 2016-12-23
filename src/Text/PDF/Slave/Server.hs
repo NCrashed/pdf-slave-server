@@ -36,19 +36,21 @@ pdfSlaveServer :: ServerT PDFSlaveAPI ServerM
 pdfSlaveServer = renderTemplateEndpoint
 
 -- | Implementation of 'RenderTemplateEndpoint'
-renderTemplateEndpoint :: RenderRequestBody -> ServerM (OnlyId RenderId)
-renderTemplateEndpoint RenderRequestBody{..} = do
+renderTemplateEndpoint :: APIRenderBody -> ServerM (OnlyId APIRenderId)
+renderTemplateEndpoint APIRenderBody{..} = do
   ServerConfig{..} <- getConfig
   n <- runQuery GetRenderQueueSize
   whenJust serverMaximumQueue $ \n' -> unless (n < n') $
     throwError $ err507 { errBody = "Rendering queue is full"}
   i <- liftIO UUID.nextRandom
   runUpdate . AddRenderItem $ RenderItem {
-      renderId       = i
-    , renderTemplate = renderReqTemplate
-    , renderInput    = renderReqInput
+      renderId       = RenderId i
+    , renderTemplate = apiRenderBodyTemplate
+    , renderInput    = apiRenderBodyInput
+    , renderUrl      = apiRenderBodyUrl
     }
-  return $ OnlyField . toRenderId $ i
+  emitRenderItem -- awake workers
+  return $ OnlyField . toAPIRenderId $ i
 
 -- | Definition of 507 HTTP error `Insufficient Storage`
 err507 :: ServantErr

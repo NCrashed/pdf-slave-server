@@ -7,13 +7,20 @@ module Text.PDF.Slave.Server.DB(
   , runQuery
   , runUpdate
   -- * Persistent entities
+  , RenderId(..)
   , RenderItem(..)
   , Notification(..)
   -- * Queries
+  -- ** Render queue
   , AddRenderItem(..)
   , GetRenderQueueSize(..)
   , CheckNextRenderItem(..)
   , FetchRenderItem(..)
+  -- ** Notification queue
+  , AddNotification(..)
+  , GetNotificationQueueSize(..)
+  , CheckNextNotification(..)
+  , FetchNotification(..)
   ) where
 
 import Control.Concurrent.Thread.Delay

@@ -43,8 +43,8 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - 'http-api-data-0.3.3'
-- 'pdf-slave-1.1.0.0'
-- 'pdf-slave-template-1.1.0.0'
+- 'pdf-slave-1.2.0.0'
+- 'pdf-slave-template-1.2.0.0'
 - 'servant-0.9.1.1'
 - 'servant-client-0.9.1.1'
 - 'servant-docs-0.9.1.1'

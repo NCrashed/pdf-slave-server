@@ -40,15 +40,23 @@ instance FromJSON DatabaseConfig where
 -- | Startup configuration of server
 data ServerConfig = ServerConfig {
   -- | Server host name
-  serverHost             :: !Text
+  serverHost                 :: !Text
   -- | Server port number
-, serverPort             :: !Int
+, serverPort                 :: !Int
   -- | If set, HTTP log would be more readable
-, serverDetailedLogging  :: !Bool
+, serverDetailedLogging      :: !Bool
   -- | Database connection options
-, serverDatabaseConf     :: !DatabaseConfig
+, serverDatabaseConf         :: !DatabaseConfig
   -- | Maximum allowed queue of templates to render
-, serverMaximumQueue     :: !(Maybe Int)
+, serverMaximumQueue         :: !(Maybe Int)
+  -- | Number of rendering workers
+, serverRenderWorkers        :: !Int
+  -- | Number of notification workers
+, serverNotificationWorkers  :: !Int
+  -- | Delays between notification tries
+, serverNotificationDelay    :: !NominalDiffTime
+  -- | Maximum number of failed notification delivers
+, serverMaxNotificationTries :: !(Maybe Int)
 } deriving (Generic, Show)
 
 instance FromJSON ServerConfig where
@@ -58,6 +66,10 @@ instance FromJSON ServerConfig where
     <*> o .: "detailed-logging"
     <*> o .: "database"
     <*> o .:? "max-queue-size"
+    <*> o .: "render-workers"
+    <*> o .: "notification-workers"
+    <*> o .: "notification-delay"
+    <*> o .:? "notification-tries"
   parseJSON _ = mzero
 
 readConfig :: MonadIO m => FilePath -> m ServerConfig
