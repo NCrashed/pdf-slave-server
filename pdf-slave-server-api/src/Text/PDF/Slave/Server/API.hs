@@ -6,18 +6,22 @@ module Text.PDF.Slave.Server.API(
   , fromAPIRenderId
   , toAPIRenderId
   , APIRenderBody(..)
+  , APINotificationBody(..)
   ) where
 
 import Control.Monad (mzero)
 import Data.Aeson
 import Data.Aeson.WithField
+import Data.ByteString (ByteString)
 import Data.Monoid
 import Data.Text
+import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.UUID (UUID)
 import GHC.Generics
 import Servant.API
 import Text.PDF.Slave.Template (Template)
 
+import qualified Data.ByteString.Base64 as B64
 import qualified Data.UUID as UUID
 
 -- | Current version of API
@@ -63,6 +67,37 @@ instance ToJSON APIRenderBody where
       "template" .= apiRenderBodyTemplate
     , "input"    .= apiRenderBodyInput
     , "url"      .= apiRenderBodyUrl
+    ]
+
+-- | Notification format that is posted by the server to user supplied URL
+data APINotificationBody = APINotificationBody {
+  -- | ID of rendering item
+  apiNotificationId       :: APIRenderId
+  -- | Persists if rendering is failed
+, apiNotificationError    :: Maybe Text
+  -- | Persists if rendering is finished successfully. Base64 encoding.
+, apiNotificationDocument :: Maybe ByteString
+} deriving (Generic, Show)
+
+instance FromJSON APINotificationBody where
+  parseJSON (Object o) = do
+    mbs <- o .:? "document"
+    doc <- case mbs of
+      Nothing -> return Nothing
+      Just bs -> case B64.decode . encodeUtf8 $ bs of
+        Left e  -> fail $ "Cannot decode document content: " <> e
+        Right a -> return $ Just a
+    APINotificationBody
+      <$> o .: "id"
+      <*> o .:? "error"
+      <*> pure doc
+  parseJSON _ = mzero
+
+instance ToJSON APINotificationBody where
+  toJSON APINotificationBody{..} = object [
+      "id"       .= apiNotificationId
+    , "error"    .= apiNotificationError
+    , "document" .= fmap (decodeUtf8 . B64.encode) apiNotificationDocument
     ]
 
 -- | Add template with input to rendering queue
