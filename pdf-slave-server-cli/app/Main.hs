@@ -136,7 +136,7 @@ runOptions Options{..} = case optionsCommand of
     where
       clientOptions = PDFSlaveClientConfig {
           pdfSlaveUrl = optionsUrl
-        , pdfSlaveReturnUrl = renderHost <> ":" <> showt renderPort
+        , pdfSlaveReturnUrl = "http://" <> renderHost <> ":" <> showt renderPort -- TODO: Support https
         , pdfSlaveManager = Nothing
         }
 

@@ -126,7 +126,9 @@ emitNotificationItem = do
 
 -- | Spawn a worker that reads next available render task from queue and executes it
 spawnRendererWorker :: ServerM ()
-spawnRendererWorker = void . Immortal.createWithLabel "rendererWorker" $ const work
+spawnRendererWorker = void . Immortal.createWithLabel "rendererWorker" $ const $ do
+  $logDebug "Spawning renderer worker"
+  work
   where
     work = do
       hasWork <- runQuery CheckNextRenderItem
@@ -135,7 +137,13 @@ spawnRendererWorker = void . Immortal.createWithLabel "rendererWorker" $ const w
           case mitem of
             Nothing -> work
             Just item -> do
+              let ri = renderId item
+              $logInfo $ "Start rendering of " <> showt ri
               renderRes <- renderDocument item
+              $logInfo $ "Finished rendering of " <> showt ri
+              case renderRes of
+                Left er -> $logWarn $ "Rendering failed with: " <> er
+                Right _ -> $logInfo $ "Rendering finished successfully"
               registerNotification item renderRes
               work
         else sleep
@@ -155,6 +163,7 @@ renderDocument RenderItem{..} = do
 -- | Convert rendering result to notification and save it
 registerNotification :: RenderItem -> Either Text PDFContent -> ServerM ()
 registerNotification RenderItem{..} res = do
+  $logInfo $ "Registering notification for " <> showt renderId
   t <- liftIO getCurrentTime
   let notification = Notification {
           notifTarget = renderUrl
@@ -169,29 +178,40 @@ registerNotification RenderItem{..} res = do
 
 -- | Spawn a worker that waits for notifications and tries to deliver them.
 spawnNotificationWorker :: ServerM ()
-spawnNotificationWorker = void . Immortal.createWithLabel "rendererWorker" $ const work
+spawnNotificationWorker = void . Immortal.createWithLabel "rendererWorker" $ const $ do
+  $logDebug "Spawning notification worker"
+  work
   where
     work = do
+      $logDebug "Check pending notifications"
       t <- liftIO getCurrentTime
       hasWork <- runQuery $ CheckNextNotification t
       if hasWork then do
+          $logDebug $ "Detected unprocessed notifications..."
           mitem <- runUpdate $ FetchNotification t
           case mitem of
-            Nothing -> work
+            Nothing -> do
+              $logDebug $ "But there is no work actually"
+              work
             Just notification -> do
               mnotification <- deliverNotification notification
               whenJust mnotification $ runUpdate . AddNotification
               work
-        else sleep
+        else do
+          $logDebug "No work for notification worker, sleep"
+          sleep
 
     sleep = do
       chan <- asks envNotificationChan
       -- run thread that will awake the worker when next notification is ready
       mt <- runQuery GetNotificationNextTime
-      whenJust mt $ \t -> void . liftIO . forkIO $ do
-        curTime <- getCurrentTime
-        delay . toMicroseconds $ diffUTCTime t curTime
-        atomically $ writeTChan chan ()
+      whenJust mt $ \t -> do
+        curTime <- liftIO getCurrentTime
+        let dt = toMicroseconds $ diffUTCTime t curTime
+        $logDebug $ "Next notification in " <> showt dt <> " ms"
+        void . liftIO . forkIO $ do
+          delay dt
+          atomically $ writeTChan chan ()
       -- wait for new notifications
       _ <- liftIO . atomically $ readTChan chan
       work
@@ -200,6 +220,7 @@ spawnNotificationWorker = void . Immortal.createWithLabel "rendererWorker" $ con
 -- try. If maximum count of tries is hit, the notification is deleted.
 deliverNotification :: Notification -> ServerM (Maybe Notification)
 deliverNotification n@Notification{..} = do
+  $logInfo $ "Trying to deliver notification for " <> showt notifRenderId
   let body = APINotificationBody {
           apiNotificationId = toAPIRenderId . unRenderId $ notifRenderId
         , apiNotificationError = either Just (const Nothing) notifDocument

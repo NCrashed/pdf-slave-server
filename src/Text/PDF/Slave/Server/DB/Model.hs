@@ -43,19 +43,19 @@ deriveSafeCopy 0 'base ''TemplateDependency
 
 -- | Notification about finished rendering
 data Notification = Notification {
-    -- | Corresponding rendering task id
-    notifRenderId  :: RenderId
-    -- | URL to send notification to
-  , notifTarget    :: Text
-    -- | Content of document or rendering error
-  , notifDocument  :: Either Text PDFContent
-    -- | Number of tries to send the document
-  , notifTries     :: Int
-    -- | If last notification sending failed the field stores error message
-  , notifLastError :: Maybe Text
-    -- | After the time the notification should be tried to be delivered
-  , notifNextTry   :: UTCTime
-  }
+  -- | Corresponding rendering task id
+  notifRenderId  :: RenderId
+  -- | URL to send notification to
+, notifTarget    :: Text
+  -- | Content of document or rendering error
+, notifDocument  :: Either Text PDFContent
+  -- | Number of tries to send the document
+, notifTries     :: Int
+  -- | If last notification sending failed the field stores error message
+, notifLastError :: Maybe Text
+  -- | After the time the notification should be tried to be delivered
+, notifNextTry   :: UTCTime
+} deriving (Generic, Show)
 
 deriveSafeCopy 0 'base ''Notification
 
@@ -128,7 +128,7 @@ checkNextNotification :: UTCTime -- ^ Fetch only those whom 'notifNextTry' is le
   -> Query Model Bool
 checkNextNotification t = do
   q <- view modelNotificationQueue
-  return $ case S.viewl . S.filter ((t <=) . notifNextTry) $ q of
+  return $ case S.viewl . S.filter ((t >=) . notifNextTry) $ q of
     EmptyL -> False
     _      -> True
 
@@ -142,7 +142,7 @@ fetchNotification :: UTCTime -- ^ Fetch only those whom 'notifNextTry' is less t
 fetchNotification t = do
   q <- use modelNotificationQueue
   -- first, remove notifications whose time have not come yet and sort in ascending order
-  let q' = S.sortBy (comparing notifNextTry) . S.filter ((t <=) . notifNextTry) $ q
+  let q' = S.sortBy (comparing notifNextTry) . S.filter ((t >=) . notifNextTry) $ q
       (mi, qleft) = case S.viewl q' of
         EmptyL    -> (Nothing, S.empty)
         i S.:< is -> (Just i, is)
