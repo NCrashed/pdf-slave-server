@@ -36,4 +36,8 @@ waitNotification :: Int -- ^ Port
 waitNotification port = do
   mvar <- newEmptyMVar
   let startServer = forkIO $ run port $ logStdoutDev $ serverApp mvar
-  bracket startServer killThread $ const $ takeMVar mvar
+  bracket startServer killThread $ const $ do
+    res <- takeMVar mvar
+    -- let server to send OK response
+    threadDelay $ 500 * 10^(3 :: Int)
+    return res
