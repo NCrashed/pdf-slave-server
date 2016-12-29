@@ -9,6 +9,7 @@ import Control.Monad.IO.Class
 import Data.Proxy
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Network.Wai.Middleware.RequestLogger
 import Servant.API
 import Servant.Server
 
@@ -34,5 +35,5 @@ waitNotification :: Int -- ^ Port
   -> IO APINotificationBody
 waitNotification port = do
   mvar <- newEmptyMVar
-  let startServer = forkIO $ run port $ serverApp mvar
+  let startServer = forkIO $ run port $ logStdoutDev $ serverApp mvar
   bracket startServer killThread $ const $ takeMVar mvar
