@@ -70,9 +70,11 @@ commandParser = subparser $
            metavar "TEMPLATE_FILE"
         <> help "Template bundle file path"
         )
-      <*> optional (argument text $
-           metavar "TEMPLATE_INPUTS_FILE"
+      <*> optional (textOption $
+           long "inputs"
+        <> short 'i'
         <> help "Path to optional template inputs"
+        <> metavar "TEMPLATE_INPUTS_FILE"
         )
       <*> argument text (
            metavar "OUTPUT_FILE"
