@@ -57,9 +57,16 @@ executable pdf-slave-server-cli
       base                     >= 4.7    && < 5
     , bytestring               >= 0.10   && < 0.11
     , optparse-applicative     >= 0.12   && < 0.13
+    , pdf-slave-server-api
     , pdf-slave-server-cli
+    , servant                  >= 0.9    && < 0.10
+    , servant-server           >= 0.9    && < 0.10
     , text                     >= 1.2    && < 1.3
+    , wai                      >= 3.2    && < 3.3
+    , warp                     >= 3.2    && < 3.3
     , yaml                     >= 0.8    && < 0.9
   default-extensions:
     RecordWildCards
     OverloadedStrings
+    DataKinds
+    TypeOperators

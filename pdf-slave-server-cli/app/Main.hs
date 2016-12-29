@@ -7,6 +7,9 @@ import Text.PDF.Slave.Server.Client
 
 import qualified Data.ByteString as BS
 
+import Server
+import Text.PDF.Slave.Server.API
+
 -- | CLI commands
 data Command =
   -- | CLI command to render template
@@ -15,6 +18,8 @@ data Command =
     renderTemplateFile  :: Text
     -- | Path to template input data
   , renderTemplateInput :: Maybe Text
+    -- | Name of PDF document where to save result
+  , renderDocumentFile  :: Text
     -- | Host of local server for notification target
   , renderHost          :: Text
     -- | Port that is used to receive notification
@@ -69,6 +74,10 @@ commandParser = subparser $
            metavar "TEMPLATE_INPUTS_FILE"
         <> help "Path to optional template inputs"
         )
+      <*> argument text (
+           metavar "OUTPUT_FILE"
+        <> help "Where to save rendered PDF document"
+        )
       <*> textOption (
            long "host"
         <> short 'h'
@@ -113,7 +122,15 @@ runOptions Options{..} = case optionsCommand of
       Left er -> putStrLn $ "Failed to put template in rendering queue: " <> show er
       Right i -> do
         putStrLn $ "Template is registered in rendering queue with id: " <> show i
-
+        putStrLn $ "Awaiting notification..."
+        nt@APINotificationBody{..} <- waitNotification renderPort
+        putStrLn $ "Received notification."
+        case (apiNotificationError, apiNotificationDocument) of
+          (Just er, _) -> putStrLn $ "Failed to render template: " <> show er
+          (_, Just bs) -> do
+            putStrLn $ "Saving result to " <> show renderDocumentFile
+            BS.writeFile (unpack renderDocumentFile) bs
+          _ -> putStrLn $ "Received malformed notification body: " <> show nt
     where
       clientOptions = PDFSlaveClientConfig {
           pdfSlaveUrl = optionsUrl
