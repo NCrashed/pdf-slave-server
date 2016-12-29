@@ -27,6 +27,7 @@ import Control.Monad.Trans.Control
 import Data.Monoid
 import Data.Text (pack, Text)
 import Data.Time (getCurrentTime, diffUTCTime, addUTCTime)
+import Data.Yaml (encode, ToJSON)
 import Servant.Server
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
@@ -153,12 +154,28 @@ spawnRendererWorker = void . Immortal.createWithLabel "rendererWorker" $ const $
       _ <- liftIO . atomically $ readTChan chan
       work
 
+-- | Write down YAML file
+writeYaml :: ToJSON a => Sh.FilePath -> a -> Sh.Sh ()
+writeYaml path a = Sh.writeBinary path $ encode a
+
 -- | Render given item
 renderDocument :: RenderItem -> ServerM (Either Text PDFContent)
 renderDocument RenderItem{..} = do
   let template = maybe renderTemplate (\i -> renderTemplate { templateInput = Just i }) renderInput
-  Sh.shelly $ Sh.handleany_sh (return . Left . pack . show) $
-    Right <$> renderBundleToPDF template
+  Sh.shelly $ Sh.handleany_sh (return . Left . pack . show) $ Sh.withTmpDir $ \tempDir -> Sh.chdir tempDir $ do
+    let templateFilename = tempDir <> "bundle.yaml"
+        outputFilename = tempDir <> "output.pdf"
+    writeYaml templateFilename template
+    _ <- Sh.bash "stack" [ "exec"
+      , "--package=aeson"      -- TODO: add packages dependencies to API
+      , "--package=bytestring"
+      , "--package=HaTeX"
+      , "--"
+      , "pdf-slave"
+      , "pdf"
+      , "--template=" <> Sh.toTextIgnore templateFilename
+      , "--output=" <> Sh.toTextIgnore outputFilename ]
+    Right <$> Sh.readBinary outputFilename
 
 -- | Convert rendering result to notification and save it
 registerNotification :: RenderItem -> Either Text PDFContent -> ServerM ()
