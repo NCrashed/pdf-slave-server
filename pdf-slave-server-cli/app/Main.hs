@@ -128,7 +128,7 @@ runOptions Options{..} = case optionsCommand of
         nt@APINotificationBody{..} <- waitNotification renderPort
         putStrLn $ "Received notification."
         case (apiNotificationError, apiNotificationDocument) of
-          (Just er, _) -> putStrLn $ "Failed to render template: " <> show er
+          (Just er, _) -> putStrLn $ "Failed to render template:\n" <> unpack er
           (_, Just bs) -> do
             putStrLn $ "Saving result to " <> show renderDocumentFile
             BS.writeFile (unpack renderDocumentFile) bs
