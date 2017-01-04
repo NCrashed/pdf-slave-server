@@ -44,6 +44,14 @@ instance FromJSON APIRenderId where
 instance ToJSON APIRenderId where
   toJSON (APIRenderId n) = String . UUID.toText $ n
 
+instance ToHttpApiData APIRenderId where
+  toUrlPiece = UUID.toText . unAPIRenderId
+
+instance FromHttpApiData APIRenderId where
+  parseUrlPiece s = case UUID.fromText s of
+    Nothing -> Left $ "Cannot parse render id " <> s
+    Just i -> Right . APIRenderId $ i
+
 -- | Conversion from render id
 fromAPIRenderId :: APIRenderId -> UUID
 fromAPIRenderId = unAPIRenderId
