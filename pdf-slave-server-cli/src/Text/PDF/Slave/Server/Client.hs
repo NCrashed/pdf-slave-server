@@ -3,6 +3,9 @@ module Text.PDF.Slave.Server.Client(
   , PDFSlaveClientM
   , runPDFSlaveClientM
   , renderTemplate
+  , APIRenderId
+  , fromAPIRenderId
+  , toAPIRenderId
   ) where
 
 import Control.Monad.Catch
@@ -57,12 +60,14 @@ liftClientM = PDFSlaveClientM . lift
 
 -- | Send template bundle with input for rendering
 renderTemplate :: Template -- ^ Template bundle to render
+  -> Maybe APIRenderId -- ^ Optional id overwrite
   -> Maybe Value -- ^ Optional value
   -> PDFSlaveClientM APIRenderId
-renderTemplate t minput = do
+renderTemplate t mid minput = do
   url <- asks envReturnUrl
   OnlyField i <- liftClientM $ renderTemplateEndpoint APIRenderBody {
-      apiRenderBodyTemplate = t
+      apiRenderBodyId = mid
+    , apiRenderBodyTemplate = t
     , apiRenderBodyInput = minput
     , apiRenderBodyUrl = url
     }

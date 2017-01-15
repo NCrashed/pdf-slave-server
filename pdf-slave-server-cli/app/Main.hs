@@ -1,11 +1,14 @@
 module Main where
 
 import Data.Text (pack, unpack, Text)
+import Data.UUID (UUID)
 import Data.Yaml (FromJSON, decodeEither')
 import Options.Applicative
+import Options.Applicative.Types
 import Text.PDF.Slave.Server.Client
 
 import qualified Data.ByteString as BS
+import qualified Data.UUID as UUID
 
 import Server
 import Text.PDF.Slave.Server.API
@@ -18,6 +21,8 @@ data Command =
     renderTemplateFile  :: Text
     -- | Path to template input data
   , renderTemplateInput :: Maybe Text
+    -- | Optional overwriting of render id
+  , renderTemplateId    :: Maybe APIRenderId
     -- | Name of PDF document where to save result
   , renderDocumentFile  :: Text
     -- | Host of local server for notification target
@@ -37,6 +42,18 @@ data Options = Options {
 -- | Same as 'strOption' but parses 'Text'
 textOption :: Mod OptionFields String -> Parser Text
 textOption m = fmap pack $ strOption m
+
+-- | Parse UUID from command line
+uuidOption :: Mod OptionFields String -> Parser UUID
+uuidOption m = fromM $ do
+  uuidStr <- oneM $ strOption m
+  case UUID.fromString uuidStr of
+    Nothing   -> fail "Failed to parse UUID"
+    Just uuid -> return uuid
+
+-- | Parse 'APIRenderId' from command line
+renderIdOption :: Mod OptionFields String -> Parser APIRenderId
+renderIdOption m = fmap toAPIRenderId $ uuidOption m
 
 -- | Same as 'show' but for 'Text'
 showt :: Show a => a -> Text
@@ -75,6 +92,11 @@ commandParser = subparser $
         <> short 'i'
         <> help "Path to optional template inputs"
         <> metavar "TEMPLATE_INPUTS_FILE"
+        )
+      <*> optional (renderIdOption $
+           long "id"
+        <> help "Optional id for request, server will use it if specified"
+        <> metavar "RENDER_ID"
         )
       <*> argument text (
            metavar "OUTPUT_FILE"
@@ -119,7 +141,7 @@ runOptions Options{..} = case optionsCommand of
         Left e -> fail $ "Failed to parse input file: " <> e
         Right a -> return a
     -- Executing request
-    res <- runPDFSlaveClientM clientOptions $ renderTemplate template templateInput
+    res <- runPDFSlaveClientM clientOptions $ renderTemplate template renderTemplateId templateInput
     case res of
       Left er -> putStrLn $ "Failed to put template in rendering queue: " <> show er
       Right i -> do

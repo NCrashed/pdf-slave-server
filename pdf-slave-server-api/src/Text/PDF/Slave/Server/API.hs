@@ -62,21 +62,24 @@ toAPIRenderId = APIRenderId
 
 -- | Body of 'RenderTemplateEndpoint'
 data APIRenderBody = APIRenderBody {
-  apiRenderBodyTemplate :: Template -- ^ Template bundle
+  apiRenderBodyId       :: Maybe APIRenderId -- ^ You can force usage of your own id for the item
+, apiRenderBodyTemplate :: Template -- ^ Template bundle
 , apiRenderBodyInput    :: Maybe Value -- ^ Optional input for template
 , apiRenderBodyUrl      :: Text -- ^ URL where to post results of rendering
 } deriving (Generic, Show)
 
 instance FromJSON APIRenderBody where
   parseJSON (Object o) = APIRenderBody
-    <$> o .: "template"
+    <$> o .:? "id"
+    <*> o .: "template"
     <*> o .:? "input"
     <*> o .: "url"
   parseJSON _ = mzero
 
 instance ToJSON APIRenderBody where
   toJSON APIRenderBody{..} = object [
-      "template" .= apiRenderBodyTemplate
+      "id"       .= apiRenderBodyId
+    , "template" .= apiRenderBodyTemplate
     , "input"    .= apiRenderBodyInput
     , "url"      .= apiRenderBodyUrl
     ]

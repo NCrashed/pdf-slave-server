@@ -42,7 +42,7 @@ renderTemplateEndpoint APIRenderBody{..} = do
   n <- runQuery GetRenderQueueSize
   whenJust serverMaximumQueue $ \n' -> unless (n < n') $
     throwError $ err507 { errBody = "Rendering queue is full"}
-  i <- liftIO UUID.nextRandom
+  i <- maybe (liftIO UUID.nextRandom) (return . fromAPIRenderId) apiRenderBodyId
   runUpdate . AddRenderItem $ RenderItem {
       renderId       = RenderId i
     , renderTemplate = apiRenderBodyTemplate
