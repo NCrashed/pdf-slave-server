@@ -1,0 +1,11 @@
+[Unit]
+Description=Slave node for rendering PDF documents
+
+[Service]
+Environment=config=/etc/pdf-slave-server.yaml
+Environment=HOME=/var/lib/pdf-slave-server
+ExecStart=/usr/bin/pdf-slave-server --conf ${config}
+
+[Install]
+WantedBy=multi-user.target
+After=network.target network-online.target

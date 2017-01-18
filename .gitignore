@@ -1,3 +1,8 @@
 .stack-work/
 state/
 pdf-slave-server.sublime-workspace
+ubuntu/data/usr
+ubuntu/data/var
+pdf-slave-server*.deb
+deploy.sh
+connect.sh
