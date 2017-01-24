@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-7.14
+resolver: lts-7.16
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -39,6 +39,10 @@ packages:
 - '.'
 - 'pdf-slave-server-api'
 - 'pdf-slave-server-cli'
+- location:
+    git: https://github.com/NCrashed/haskintex.git
+    commit: b100ebf945f4ee9f28c5a2424e46f718f46a1e30
+  extra-dep: true
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
@@ -50,6 +54,7 @@ extra-deps:
 - 'servant-client-0.9.1.1'
 - 'servant-docs-0.9.1.1'
 - 'servant-server-0.9.1.1'
+- 'haskell-src-exts-1.19.1'
 
 # Override default flag values for local packages and extra-deps
 flags: {}
