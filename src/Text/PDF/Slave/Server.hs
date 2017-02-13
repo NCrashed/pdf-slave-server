@@ -14,6 +14,7 @@ import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Data.Aeson.WithField
 import Data.Proxy
+import Servant.API
 import Servant.API.Auth.Token
 import Servant.Server
 import Servant.Server.Auth.Token
@@ -26,12 +27,13 @@ import Text.PDF.Slave.Server.DB
 import Text.PDF.Slave.Server.Monad
 
 -- | Full Server API
-type ServerAPI = PDFSlaveAPI
+type ServerAPI = PDFSlaveAPI :<|> AuthAPI
 
 -- | WAI application of server
 pdfSlaveServerApp :: ServerEnv -> Application
 pdfSlaveServerApp e = serve (Proxy :: Proxy ServerAPI) $ enter (serverMtoHandler e) $
-  pdfSlaveServer
+       pdfSlaveServer
+  :<|> enter authToServerM (authServer :: ServerT AuthAPI AuthM)
 
 -- | Implementation of main server API
 pdfSlaveServer :: ServerT PDFSlaveAPI ServerM

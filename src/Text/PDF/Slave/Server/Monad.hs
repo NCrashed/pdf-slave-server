@@ -11,6 +11,7 @@ module Text.PDF.Slave.Server.Monad(
   -- * Auth monad
   , AuthM
   , runAuth
+  , authToServerM
   -- * Utilities
   , getConfig
   , emitRenderItem
@@ -306,3 +307,7 @@ runAuth m = do
   cfg <- asks (serverAuthConfig . envConfig)
   db <- asks envDB
   liftHandler $ ExceptT $ A.runAcidBackendT cfg db $ unAuthM m
+
+-- | Transformation from 'AuthM' monad to 'ServerM'
+authToServerM :: AuthM :~> ServerM
+authToServerM = Nat runAuth
