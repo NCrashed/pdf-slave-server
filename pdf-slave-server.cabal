@@ -47,6 +47,9 @@ library
     , safecopy                 >= 0.9      && < 0.10
     , scientific               >= 0.3      && < 0.4
     , servant                  >= 0.9      && < 0.10
+    , servant-auth-token       >= 0.4      && < 0.5
+    , servant-auth-token-acid  >= 0.4      && < 0.5
+    , servant-auth-token-api   >= 0.4      && < 0.5
     , servant-server           >= 0.9      && < 0.10
     , shelly                   >= 1.6      && < 1.7
     , stm                      >= 2.4      && < 2.5
@@ -60,6 +63,7 @@ library
     , yaml                     >= 0.8      && < 0.9
   default-extensions:
     BangPatterns
+    DataKinds
     DeriveGeneric
     FlexibleContexts
     FlexibleInstances
@@ -76,6 +80,7 @@ library
     TupleSections
     TypeFamilies
     TypeOperators
+    UndecidableInstances
 
 executable pdf-slave-server
   hs-source-dirs:      app

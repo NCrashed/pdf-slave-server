@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Text.PDF.Slave.Server.Monad(
   -- * Monad
     ServerM
@@ -7,6 +8,9 @@ module Text.PDF.Slave.Server.Monad(
   -- ** Monad environment
   , ServerEnv(..)
   , newServerEnv
+  -- * Auth monad
+  , AuthM
+  , runAuth
   -- * Utilities
   , getConfig
   , emitRenderItem
@@ -28,9 +32,12 @@ import Data.Monoid
 import Data.Text (pack, Text)
 import Data.Time (getCurrentTime, diffUTCTime, addUTCTime)
 import Data.Yaml (encode, ToJSON)
-import Servant.Server
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
+import Servant.Server
+import Servant.Server.Auth.Token.Config
+import Servant.Server.Auth.Token.Model
+import Text.PDF.Slave.Server.DB.Model
 
 import Text.PDF.Slave
 import Text.PDF.Slave.Server.API (APINotificationBody(..), toAPIRenderId)
@@ -39,6 +46,7 @@ import Text.PDF.Slave.Server.DB
 import Text.PDF.Slave.Server.Notification
 import Text.PDF.Slave.Server.Util
 
+import qualified Servant.Server.Auth.Token.Acid as A
 import qualified Control.Immortal as Immortal
 import qualified Shelly as Sh
 
@@ -92,6 +100,10 @@ instance MonadBaseControl IO ServerM where
 
 instance HasAcidState Model ServerM where
   getAcidState = asks envDB
+
+-- | Lift servant monad to server monad
+liftHandler :: Handler a -> ServerM a
+liftHandler = ServerM . lift . lift
 
 -- | Execution of 'ServerM'
 runServerM :: ServerEnv -> ServerM a -> Handler a
@@ -279,3 +291,18 @@ deliverNotification n@Notification{..} = do
       $logInfo $ "Notification for " <> showt notifRenderId
         <> " is succeded!"
       return Nothing
+
+-- Derive HasStorage for 'AcidBackendT' with 'Model'.
+-- It is important that it is come before the below newtype
+A.deriveAcidHasStorage ''Model
+
+-- | Special monad for authorisation actions
+newtype AuthM a = AuthM { unAuthM :: A.AcidBackendT Model IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError ServantErr, HasAuthConfig, HasStorage)
+
+-- | Execution of authorisation actions that require 'AuthHandler' context
+runAuth :: AuthM a -> ServerM a
+runAuth m = do
+  cfg <- asks (serverAuthConfig . envConfig)
+  db <- asks envDB
+  liftHandler $ ExceptT $ A.runAcidBackendT cfg db $ unAuthM m

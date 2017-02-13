@@ -12,10 +12,12 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson (Value)
+import Data.IORef
 import Data.Proxy
 import Data.Text (Text, unpack)
 import Network.HTTP.Client (Manager)
 import Network.HTTP.Client.TLS
+import Servant.API.Auth.Token
 import Servant.Client
 import Text.PDF.Slave.Server.API
 
@@ -32,6 +34,7 @@ data PDFSlaveClientConfig = PDFSlaveClientConfig {
 -- | Environment of 'PDFSlaveClientM' monad
 data PDFSlaveClientEnv = PDFSlaveClientEnv {
   envReturnUrl :: Text
+, envTokenRef  :: IORef (MToken' '["render"])
 }
 
 -- | Wrapper for client monad
@@ -46,11 +49,13 @@ runPDFSlaveClientM :: (MonadIO m, MonadThrow m)
   -> m (Either ServantError a)
 runPDFSlaveClientM PDFSlaveClientConfig{..} m = do
   baseUrl <- parseBaseUrl (unpack pdfSlaveUrl)
+  ref <- liftIO $ newIORef Nothing
   mng <- case pdfSlaveManager of
     Nothing -> liftIO getGlobalManager
     Just mng -> return mng
   let env = PDFSlaveClientEnv {
           envReturnUrl = pdfSlaveReturnUrl
+        , envTokenRef  = ref
         }
   liftIO $ runClientM (runReaderT (unPDFSlaveClientM m) env) (ClientEnv mng baseUrl)
 
@@ -64,15 +69,16 @@ renderTemplate :: Template -- ^ Template bundle to render
   -> Maybe Value -- ^ Optional value
   -> PDFSlaveClientM APIRenderId
 renderTemplate t mid minput = do
-  url <- asks envReturnUrl
+  PDFSlaveClientEnv{..} <- ask
+  mtoken <- liftIO $ readIORef envTokenRef
   OnlyField i <- liftClientM $ renderTemplateEndpoint APIRenderBody {
       apiRenderBodyId = mid
     , apiRenderBodyTemplate = t
     , apiRenderBodyInput = minput
-    , apiRenderBodyUrl = url
-    }
+    , apiRenderBodyUrl = envReturnUrl
+    } mtoken
   return i
 
-renderTemplateEndpoint :: APIRenderBody -> ClientM (OnlyId APIRenderId)
+renderTemplateEndpoint :: APIRenderBody -> MToken' '["render"] -> ClientM (OnlyId APIRenderId)
 ( renderTemplateEndpoint
   ) = client (Proxy :: Proxy PDFSlaveAPI)

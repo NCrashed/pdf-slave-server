@@ -10,3 +10,7 @@ render-workers: 1
 notification-workers: 1
 notification-delay: 30 # each 30 seconds try to deliver
 notification-tries: 5 # try 5 times then throw away results
+admin-password: "123456"
+token-expire: 2000 # default expire of session (token)
+maximum-expire: 2000 # maximum seconds that user can prolong a session by single call
+password-strength: 17 # exponentional power of password (update with increase of CPU performance)

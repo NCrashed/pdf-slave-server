@@ -12,6 +12,7 @@ import Data.Time
 import Data.Yaml
 import Data.Yaml.Config
 import GHC.Generics
+import Servant.Server.Auth.Token.Config
 
 -- | Configuration for database connection
 data DatabaseConfig = DatabaseConfig {
@@ -57,19 +58,38 @@ data ServerConfig = ServerConfig {
 , serverNotificationDelay    :: !NominalDiffTime
   -- | Maximum number of failed notification delivers
 , serverMaxNotificationTries :: !(Maybe Int)
-} deriving (Generic, Show)
+  -- | Fixed password for admin account
+, serverAdminPassword        :: !Text
+  -- | Server authorisation config
+, serverAuthConfig           :: !AuthConfig
+} deriving (Generic)
+
+-- | Prepare 'AuthConfig' from JSON object
+parseAuthConfig :: Value -> Parser AuthConfig
+parseAuthConfig (Object o) = do
+  tokenExpire <- o .: "token-expire"
+  strength <- o .: "password-strength"
+  maxExpire <- o .: "maximum-expire"
+  return defaultAuthConfig {
+      defaultExpire = tokenExpire
+    , passwordsStrength = strength
+    , maximumExpire = maxExpire
+    }
+parseAuthConfig _ = mzero
 
 instance FromJSON ServerConfig where
-  parseJSON (Object o) = ServerConfig
-    <$> o .: "host"
-    <*> o .: "port"
-    <*> o .: "detailed-logging"
-    <*> o .: "database"
+  parseJSON v@(Object o) = ServerConfig
+    <$> o .:  "host"
+    <*> o .:  "port"
+    <*> o .:  "detailed-logging"
+    <*> o .:  "database"
     <*> o .:? "max-queue-size"
-    <*> o .: "render-workers"
-    <*> o .: "notification-workers"
-    <*> o .: "notification-delay"
+    <*> o .:  "render-workers"
+    <*> o .:  "notification-workers"
+    <*> o .:  "notification-delay"
     <*> o .:? "notification-tries"
+    <*> o .:  "admin-password"
+    <*> parseAuthConfig v
   parseJSON _ = mzero
 
 readConfig :: MonadIO m => FilePath -> m ServerConfig

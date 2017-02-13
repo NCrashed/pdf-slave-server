@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 module Text.PDF.Slave.Server.DB.Model where
 
 import Control.Lens
@@ -16,8 +17,9 @@ import Data.UUID
 import GHC.Generics
 import Text.PDF.Slave
 
-import qualified Data.Sequence as S
 import qualified Data.HashMap.Strict as H
+import qualified Data.Sequence as S
+import qualified Servant.Server.Auth.Token.Acid.Schema as A
 
 -- | Wrapper around UUID
 newtype RenderId = RenderId { unRenderId :: UUID }
@@ -65,6 +67,8 @@ data Model = Model {
   _modelRenderQueue :: Seq RenderItem
   -- | Notification queue
 , _modelNotificationQueue :: Seq Notification
+  -- | Authentification state
+, _modelAuth :: A.Model
 }
 
 makeLenses ''Model
@@ -75,6 +79,7 @@ initialModel :: Model
 initialModel = Model {
     _modelRenderQueue = mempty
   , _modelNotificationQueue = mempty
+  , _modelAuth = A.newModel
   }
 
 -- | Register new item in queue
@@ -157,17 +162,18 @@ getNotificationNextTime = do
     EmptyL   -> Nothing
     t S.:< _ -> Just t
 
-makeAcidic ''Model [
-    'addRenderItem
-  , 'checkNextRenderItem
-  , 'fetchRenderItem
-  , 'getRenderQueueSize
-  , 'addNotification
-  , 'checkNextNotification
-  , 'getNotificationQueueSize
-  , 'fetchNotification
-  , 'getNotificationNextTime
-  ]
+-- ACID for authentification
+
+-- | Extraction of Auth model from global state
+instance A.HasModelRead Model where
+  askModel = _modelAuth
+
+-- | Extraction of Auth model from global state
+instance A.HasModelWrite Model where
+  putModel db m = db { _modelAuth = m }
+
+-- Mixin auth state queries and derive acid-state instances for them
+A.deriveQueries ''Model
 
 -- | ACID for aeson
 
@@ -178,3 +184,17 @@ deriveSafeCopy 0 'base ''Scientific
 instance (SafeCopy a, Eq a, Hashable a, SafeCopy b) => SafeCopy (H.HashMap a b) where
     getCopy = contain $ fmap H.fromList safeGet
     putCopy = contain . safePut . H.toList
+
+
+makeAcidic ''Model $ [
+    'addRenderItem
+  , 'checkNextRenderItem
+  , 'fetchRenderItem
+  , 'getRenderQueueSize
+  , 'addNotification
+  , 'checkNextNotification
+  , 'getNotificationQueueSize
+  , 'fetchNotification
+  , 'getNotificationNextTime
+  ]
+  ++ A.acidQueries

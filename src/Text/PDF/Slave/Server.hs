@@ -14,7 +14,9 @@ import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Data.Aeson.WithField
 import Data.Proxy
+import Servant.API.Auth.Token
 import Servant.Server
+import Servant.Server.Auth.Token
 
 import qualified Data.UUID.V4 as UUID
 
@@ -36,8 +38,11 @@ pdfSlaveServer :: ServerT PDFSlaveAPI ServerM
 pdfSlaveServer = renderTemplateEndpoint
 
 -- | Implementation of 'RenderTemplateEndpoint'
-renderTemplateEndpoint :: APIRenderBody -> ServerM (OnlyId APIRenderId)
-renderTemplateEndpoint APIRenderBody{..} = do
+renderTemplateEndpoint :: APIRenderBody
+  -> MToken' '["render"]
+  -> ServerM (OnlyId APIRenderId)
+renderTemplateEndpoint APIRenderBody{..} token = do
+  runAuth $ guardAuthToken token
   ServerConfig{..} <- getConfig
   n <- runQuery GetRenderQueueSize
   whenJust serverMaximumQueue $ \n' -> unless (n < n') $

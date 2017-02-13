@@ -23,6 +23,7 @@ import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.UUID (UUID)
 import GHC.Generics
 import Servant.API
+import Servant.API.Auth.Token
 import Text.PDF.Slave.Template (Template)
 
 import qualified Data.ByteString.Base64 as B64
@@ -118,6 +119,7 @@ instance ToJSON APINotificationBody where
 -- | Add template with input to rendering queue
 type RenderTemplateEndpoint = "template" :> "render"
   :> ReqBody '[JSON] APIRenderBody
+  :> TokenHeader' '["render"]
   :> Post '[JSON] (OnlyId APIRenderId)
 
 -- | API of PDF slave server

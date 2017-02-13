@@ -47,14 +47,17 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
+- 'haskell-src-exts-1.19.1'
 - 'http-api-data-0.3.3'
 - 'pdf-slave-1.2.1.0'
 - 'pdf-slave-template-1.2.0.0'
 - 'servant-0.9.1.1'
+- 'servant-auth-token-0.4.1.0'
+- 'servant-auth-token-acid-0.4.1.0'
+- 'servant-auth-token-api-0.4.0.0'
 - 'servant-client-0.9.1.1'
 - 'servant-docs-0.9.1.1'
 - 'servant-server-0.9.1.1'
-- 'haskell-src-exts-1.19.1'
 
 # Override default flag values for local packages and extra-deps
 flags: {}
