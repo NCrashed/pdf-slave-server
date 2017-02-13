@@ -67,6 +67,25 @@ data ServerEnv = ServerEnv {
 , envManager :: Manager
 }
 
+-- Derive HasStorage for 'AcidBackendT' with 'Model'.
+-- It is important that it is come before the below newtype
+A.deriveAcidHasStorage ''Model
+
+-- | Special monad for authorisation actions
+newtype AuthM a = AuthM { unAuthM :: A.AcidBackendT Model IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadError ServantErr, HasAuthConfig, HasStorage)
+
+-- | Execution of authorisation actions that require 'AuthHandler' context
+runAuth :: AuthM a -> ServerM a
+runAuth m = do
+  cfg <- asks (serverAuthConfig . envConfig)
+  db <- asks envDB
+  liftHandler $ ExceptT $ A.runAcidBackendT cfg db $ unAuthM m
+
+-- | Transformation from 'AuthM' monad to 'ServerM'
+authToServerM :: AuthM :~> ServerM
+authToServerM = Nat runAuth
+
 -- | Create new server environment
 newServerEnv :: (MonadIO m, MonadBaseControl IO m)
   => ServerConfig -> m ServerEnv
@@ -83,6 +102,7 @@ newServerEnv cfg = do
       , envManager = mng
       }
   liftIO . runServerMIO env $ do
+    runAuth $ ensureAdmin (passwordsStrength . serverAuthConfig $ cfg) "admin" (serverAdminPassword cfg) "admin@localhost"
     replicateM_ (serverRenderWorkers cfg) spawnRendererWorker
     replicateM_ (serverNotificationWorkers cfg) spawnNotificationWorker
   return env
@@ -292,22 +312,3 @@ deliverNotification n@Notification{..} = do
       $logInfo $ "Notification for " <> showt notifRenderId
         <> " is succeded!"
       return Nothing
-
--- Derive HasStorage for 'AcidBackendT' with 'Model'.
--- It is important that it is come before the below newtype
-A.deriveAcidHasStorage ''Model
-
--- | Special monad for authorisation actions
-newtype AuthM a = AuthM { unAuthM :: A.AcidBackendT Model IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError ServantErr, HasAuthConfig, HasStorage)
-
--- | Execution of authorisation actions that require 'AuthHandler' context
-runAuth :: AuthM a -> ServerM a
-runAuth m = do
-  cfg <- asks (serverAuthConfig . envConfig)
-  db <- asks envDB
-  liftHandler $ ExceptT $ A.runAcidBackendT cfg db $ unAuthM m
-
--- | Transformation from 'AuthM' monad to 'ServerM'
-authToServerM :: AuthM :~> ServerM
-authToServerM = Nat runAuth
