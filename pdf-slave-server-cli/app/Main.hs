@@ -34,9 +34,15 @@ data Command =
 -- | Command line options
 data Options = Options {
   -- | Command to execute
-  optionsCommand :: Command
+  optionsCommand  :: Command
   -- | Server URL
-, optionsUrl     :: Text
+, optionsUrl      :: Text
+  -- | Authorisation login
+, optionsLogin    :: Text
+  -- | Authorisation password
+, optionsPassword :: Text
+  -- | Number of seconds an authorisation token is hold
+, optionsExpire   :: Word
 }
 
 -- | Same as 'strOption' but parses 'Text'
@@ -74,6 +80,19 @@ parseOptions = Options
     <> help "PDF slave server URL"
     <> metavar "SERVER_URL"
     )
+  <*> textOption (
+       long "login"
+    <> short 'l'
+    <> help "Login account"
+    <> metavar "LOGIN"
+    )
+  <*> textOption (
+       long "password"
+    <> short 'p'
+    <> help "Password for account"
+    <> metavar "PASSWORD"
+    )
+  <*> pure 1200
 
 -- | Parse CLI command
 commandParser :: Parser Command
@@ -141,7 +160,8 @@ runOptions Options{..} = case optionsCommand of
         Left e -> fail $ "Failed to parse input file: " <> e
         Right a -> return a
     -- Executing request
-    res <- runPDFSlaveClientM clientOptions $ renderTemplate template renderTemplateId templateInput
+    res <- runPDFSlaveClientM clientOptions $ withAuth optionsLogin optionsPassword optionsExpire $
+      renderTemplate template renderTemplateId templateInput
     case res of
       Left er -> putStrLn $ "Failed to put template in rendering queue: " <> show er
       Right i -> do

@@ -3,6 +3,7 @@ module Text.PDF.Slave.Server.Client(
   , PDFSlaveClientM
   , runPDFSlaveClientM
   , renderTemplate
+  , withAuth
   , APIRenderId
   , fromAPIRenderId
   , toAPIRenderId
@@ -12,11 +13,14 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson (Value)
+import Data.Aeson.WithField
+import Data.Aeson.Unit
 import Data.IORef
 import Data.Proxy
 import Data.Text (Text, unpack)
 import Network.HTTP.Client (Manager)
 import Network.HTTP.Client.TLS
+import Servant.API
 import Servant.API.Auth.Token
 import Servant.Client
 import Text.PDF.Slave.Server.API
@@ -79,6 +83,39 @@ renderTemplate t mid minput = do
     } mtoken
   return i
 
+-- | Sign in the server and cache authentification token
+authSignin :: Login -> Password -> Seconds -> PDFSlaveClientM ()
+authSignin login password expire = do
+  OnlyField token <- liftClientM $ authSigninMethod (Just login) (Just password) (Just expire)
+  PDFSlaveClientEnv{..} <- ask
+  liftIO $ writeIORef envTokenRef (Just $ Token token)
+
+-- | Signouts from server
+authSignout :: PDFSlaveClientM ()
+authSignout = do
+  PDFSlaveClientEnv{..} <- ask
+  mtoken <- liftIO $ readIORef envTokenRef
+  case mtoken of
+    Nothing -> return ()
+    Just token -> void . liftClientM $ authSignoutMethod (Just $ downgradeToken' token)
+
+-- | Run given scope with authorisation
+withAuth :: Login -> Password -> Seconds -> PDFSlaveClientM a -> PDFSlaveClientM a
+withAuth login password expire m = do
+  authSignin login password expire
+  a <- m
+  authSignout
+  return a
+
+-- | Client API is subset of full API of server
+type ClientAPI = PDFSlaveAPI
+  :<|> AuthSigninMethod
+  :<|> AuthSignoutMethod
+
 renderTemplateEndpoint :: APIRenderBody -> MToken' '["render"] -> ClientM (OnlyId APIRenderId)
-( renderTemplateEndpoint
-  ) = client (Proxy :: Proxy PDFSlaveAPI)
+authSigninMethod :: Maybe Login -> Maybe Password -> Maybe Seconds -> ClientM (OnlyField "token" SimpleToken)
+authSignoutMethod :: MToken' '[] -> ClientM Unit
+(      renderTemplateEndpoint
+  :<|> authSigninMethod
+  :<|> authSignoutMethod
+  ) = client (Proxy :: Proxy ClientAPI)
