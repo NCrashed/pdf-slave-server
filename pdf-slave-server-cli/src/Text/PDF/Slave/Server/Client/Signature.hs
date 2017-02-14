@@ -15,6 +15,7 @@ import Servant.API.Auth.Token
 
 import Text.PDF.Slave.Server.API
 
+import qualified Data.ByteString.Base16   as B16
 import qualified Data.ByteString.Lazy     as BSL (ByteString, fromStrict)
 
 -- | Check notification signature that is packed in response header.
@@ -41,12 +42,12 @@ checkSignature url body tok sig = sig == makeSignature url body tok
 --
 -- The request is signed with SHA256. The hash is applied to URI, full body of
 -- query, authorisation token that are separated by commas. The signatures
--- is placed in 'X-Signature' header.
+-- is placed in 'X-Signature' header. Header content is encoded in Base16.
 makeSignature :: String -- ^ Base url of shop endpoint
     -> BSL.ByteString -- ^ Request body that we sign
     -> SimpleToken -- ^ Authorisation token that is used to request the render
     -> Signature -- ^ SHA256 hash aka signature
-makeSignature url body token = decodeUtf8 $ convert digets
+makeSignature url body token = decodeUtf8 . B16.encode . convert $ digets
     where
     toBs = BSL.fromStrict . encodeUtf8 . pack
     signBody = toBs url <> "," <> body <> "," <> toBs (show token)

@@ -126,7 +126,7 @@ type Signature = Text
 --
 -- How the signature is calculated: the full URI of notification target, the body of
 -- request and the user authentification token are intercalated (concated) with commas.
--- Then a SHA256 of the resulted string is calculated.
+-- Then a SHA256 of the resulted string is calculated. Header content is encoded in Base16.
 --
 -- The signature garanteeres that the document is rendered and delivered exactly by
 -- the slave node not malicious remote machine.

@@ -7,6 +7,7 @@ import Control.Concurrent
 import Control.Exception (bracket)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
+import Data.IORef
 import Data.Proxy
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -20,6 +21,7 @@ import Text.PDF.Slave.Server.API
 import Text.PDF.Slave.Server.Client.Signature
 
 import qualified Data.Vault.Lazy as V
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
 -- | API of server, simply accept notification
@@ -30,17 +32,34 @@ type ServerAPI =
   :> Post '[JSON] ()
 
 -- | Id of request body in middleware vault
-bodyKey :: V.Key ByteString
+bodyKey :: V.Key BSL.ByteString
 bodyKey = unsafePerformIO V.newKey
 {-# NOINLINE bodyKey #-}
 
 -- | Middleware that puts request body to Vault to check signature againts it
 bodyCacheMiddleware :: Middleware
 bodyCacheMiddleware app req respond = do
-  body <- requestBody req
+  let
+    readAllBody :: [ByteString] -> IO [ByteString]
+    readAllBody !acc = do
+      ch <- requestBody req
+      if BS.length ch == 0 then return acc
+        else readAllBody (ch : acc)
+
+  body <- BSL.fromChunks . reverse <$> readAllBody []
+  readRef <- newIORef False
+  print $ requestHeaders req
   let vault' = V.insert bodyKey body (vault req)
-      req' = req { vault = vault' }
+      req' = req {
+          vault = vault'
+        , requestBody = do
+            isRead <- readIORef readRef
+            writeIORef readRef True
+            return $ if isRead then BS.empty else BSL.toStrict body
+        , requestBodyLength = KnownLength $ fromIntegral $ BSL.length body
+        }
   app req' respond
+
 
 -- | Serve server for notification receiving
 server :: MVar (Either String APINotificationBody) -- ^ Where to place notification
@@ -51,7 +70,7 @@ server mvar url token notification msig vault = case msig of
   Nothing -> putRes $ Left "Missing signature for notification!"
   Just sig -> case V.lookup bodyKey vault of
     Nothing -> putRes $ Left "Impossible: vault doesn't contain request body!"
-    Just body -> if checkSignature url (BSL.fromStrict body) token sig
+    Just body -> if checkSignature url body token sig
       then putRes $ Right notification
       else putRes $ Left "Signatures don't match, possible hijack!"
   where

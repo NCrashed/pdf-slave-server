@@ -22,6 +22,7 @@ library
       base                    >= 4.7    && < 5
     , aeson                   >= 0.11   && < 0.12
     , aeson-injector          >= 1.0    && < 1.1
+    , base16-bytestring       >= 0.1    && < 0.2
     , bytestring              >= 0.10   && < 0.11
     , cryptonite              >= 0.21   && < 0.22
     , exceptions              >= 0.8    && < 0.9
@@ -76,7 +77,8 @@ executable pdf-slave-server-cli
     , warp                     >= 3.2    && < 3.3
     , yaml                     >= 0.8    && < 0.9
   default-extensions:
-    RecordWildCards
-    OverloadedStrings
+    BangPatterns
     DataKinds
+    OverloadedStrings
+    RecordWildCards
     TypeOperators
