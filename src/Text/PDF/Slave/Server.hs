@@ -13,6 +13,7 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Monad.IO.Class
 import Data.Aeson.WithField
+import Data.Maybe
 import Data.Proxy
 import Servant.API
 import Servant.API.Auth.Token
@@ -55,6 +56,7 @@ renderTemplateEndpoint APIRenderBody{..} token = do
     , renderTemplate = apiRenderBodyTemplate
     , renderInput    = apiRenderBodyInput
     , renderUrl      = apiRenderBodyUrl
+    , renderToken    = unToken $ fromJust token -- already guarded Nothing
     }
   emitRenderItem -- awake workers
   return $ OnlyField . toAPIRenderId $ i

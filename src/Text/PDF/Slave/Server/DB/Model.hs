@@ -15,6 +15,7 @@ import Data.Text
 import Data.Time
 import Data.UUID
 import GHC.Generics
+import Servant.API.Auth.Token
 import Text.PDF.Slave
 
 import qualified Data.HashMap.Strict as H
@@ -37,6 +38,8 @@ data RenderItem = RenderItem {
 , renderInput    :: Maybe Value
   -- | Notification URL for positing results
 , renderUrl      :: Text
+  -- | Saved token that is used to create the render
+, renderToken    :: SimpleToken
 } deriving (Generic)
 
 deriveSafeCopy 0 'base ''RenderItem
@@ -57,6 +60,8 @@ data Notification = Notification {
 , notifLastError :: Maybe Text
   -- | After the time the notification should be tried to be delivered
 , notifNextTry   :: UTCTime
+  -- | Saved token that is used to sign notification
+, notifToken     :: SimpleToken
 } deriving (Generic, Show)
 
 deriveSafeCopy 0 'base ''Notification

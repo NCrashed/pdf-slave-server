@@ -222,6 +222,7 @@ registerNotification RenderItem{..} res = do
         , notifTries = 0
         , notifLastError = Nothing
         , notifNextTry = t
+        , notifToken = renderToken
         }
   runUpdate . AddNotification $ notification
   emitNotificationItem -- awake notification workers
@@ -277,7 +278,7 @@ deliverNotification n@Notification{..} = do
         , apiNotificationDocument = either (const Nothing) Just notifDocument
         }
   mng <- asks envManager
-  res <- postNotification mng notifTarget body
+  res <- postNotification mng notifTarget body notifToken
   case res of
     Left (BadBaseUrl e) -> do
       $logError $ "Notification for " <> showt notifRenderId

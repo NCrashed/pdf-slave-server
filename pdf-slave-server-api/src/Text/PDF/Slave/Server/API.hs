@@ -7,6 +7,8 @@ module Text.PDF.Slave.Server.API(
   , toAPIRenderId
   , APIRenderBody(..)
   , APINotificationBody(..)
+  , Signature
+  , SignatureHeader
   -- * Reexports
   , OnlyField(..)
   , OnlyId
@@ -115,6 +117,20 @@ instance ToJSON APINotificationBody where
     , "error"    .= apiNotificationError
     , "document" .= fmap (decodeUtf8 . B64.encode) apiNotificationDocument
     ]
+
+-- | Signature of notification response.
+type Signature = ByteString
+
+-- | Header that contains notification signature. Each notification is sended with
+-- the signature.
+--
+-- How the signature is calculated: the full URI of notification target, the body of
+-- request and the user authentification token are intercalated (concated) with commas.
+-- Then a SHA256 of the resulted string is calculated.
+--
+-- The signature garanteeres that the document is rendered and delivered exactly by
+-- the slave node not malicious remote machine.
+type SignatureHeader = Header "X-Signature" Signature
 
 -- | Add template with input to rendering queue
 type RenderTemplateEndpoint = "template" :> "render"
