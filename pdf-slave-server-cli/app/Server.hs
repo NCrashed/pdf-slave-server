@@ -6,36 +6,73 @@ module Server(
 import Control.Concurrent
 import Control.Exception (bracket)
 import Control.Monad.IO.Class
+import Data.ByteString (ByteString)
 import Data.Proxy
 import Network.Wai
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.RequestLogger
 import Servant.API
+import Servant.API.Auth.Token
 import Servant.Server
+import System.IO.Unsafe (unsafePerformIO)
 
 import Text.PDF.Slave.Server.API
+import Text.PDF.Slave.Server.Client.Signature
+
+import qualified Data.Vault.Lazy as V
+import qualified Data.ByteString.Lazy as BSL
 
 -- | API of server, simply accept notification
 type ServerAPI =
      ReqBody '[JSON] APINotificationBody
+  :> SignatureHeader
+  :> Vault
   :> Post '[JSON] ()
 
+-- | Id of request body in middleware vault
+bodyKey :: V.Key ByteString
+bodyKey = unsafePerformIO V.newKey
+{-# NOINLINE bodyKey #-}
+
+-- | Middleware that puts request body to Vault to check signature againts it
+bodyCacheMiddleware :: Middleware
+bodyCacheMiddleware app req respond = do
+  body <- requestBody req
+  let vault' = V.insert bodyKey body (vault req)
+      req' = req { vault = vault' }
+  app req' respond
+
 -- | Serve server for notification receiving
-server :: MVar APINotificationBody -- ^ Where to place notification
+server :: MVar (Either String APINotificationBody) -- ^ Where to place notification
+  -> String -- ^ Full url of notification target to check signature with
+  -> SimpleToken -- ^ Authorisation token to check signature with
   -> Server ServerAPI
-server mvar notification = liftIO $ putMVar mvar notification
+server mvar url token notification msig vault = case msig of
+  Nothing -> putRes $ Left "Missing signature for notification!"
+  Just sig -> case V.lookup bodyKey vault of
+    Nothing -> putRes $ Left "Impossible: vault doesn't contain request body!"
+    Just body -> if checkSignature url (BSL.fromStrict body) token sig
+      then putRes $ Right notification
+      else putRes $ Left "Signatures don't match, possible hijack!"
+  where
+    putRes = liftIO . putMVar mvar
 
 -- | WAI application for the server
-serverApp :: MVar APINotificationBody -> Application
-serverApp = serve (Proxy :: Proxy ServerAPI) . server
+serverApp :: MVar (Either String APINotificationBody)
+  -> String -- ^ Full url of notification target to check signature with
+  -> SimpleToken -- ^ Authorisation token to check signature with
+  -> Application
+serverApp mvar url token = serve (Proxy :: Proxy ServerAPI) $ server mvar url token
 
 -- | Start internal server and listen for incoming notifications, terminates
 -- immediatily after notification arrive.
 waitNotification :: Int -- ^ Port
-  -> IO APINotificationBody
-waitNotification port = do
+  -> String -- ^ Full url of notification target to check signature with
+  -> SimpleToken -- ^ Authorisation token to check signature with
+  -> IO (Either String APINotificationBody)
+waitNotification port url token = do
   mvar <- newEmptyMVar
-  let startServer = forkIO $ run port $ logStdoutDev $ serverApp mvar
+  let startServer = forkIO $ run port $ logStdoutDev . bodyCacheMiddleware $ serverApp mvar url token
   bracket startServer killThread $ const $ do
     res <- takeMVar mvar
     -- let server to send OK response

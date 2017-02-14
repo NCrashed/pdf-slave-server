@@ -17,13 +17,17 @@ library
   hs-source-dirs:      src
   exposed-modules:
     Text.PDF.Slave.Server.Client
+    Text.PDF.Slave.Server.Client.Signature
   build-depends:
       base                    >= 4.7    && < 5
     , aeson                   >= 0.11   && < 0.12
     , aeson-injector          >= 1.0    && < 1.1
+    , bytestring              >= 0.10   && < 0.11
+    , cryptonite              >= 0.21   && < 0.22
     , exceptions              >= 0.8    && < 0.9
     , http-client             >= 0.4    && < 0.5
     , http-client-tls         >= 0.2    && < 0.3
+    , memory                  >= 0.13   && < 0.14
     , mtl                     >= 2.2    && < 2.3
     , pdf-slave-server-api    >= 0.1    && < 0.2
     , servant                 >= 0.9    && < 0.10
@@ -62,9 +66,11 @@ executable pdf-slave-server-cli
     , pdf-slave-server-api
     , pdf-slave-server-cli
     , servant                  >= 0.9    && < 0.10
+    , servant-auth-token-api   >= 0.4    && < 0.5
     , servant-server           >= 0.9    && < 0.10
     , text                     >= 1.2    && < 1.3
     , uuid                     >= 1.3    && < 1.4
+    , vault                    >= 0.3    && < 0.4
     , wai                      >= 3.2    && < 3.3
     , wai-extra                >= 3.0    && < 3.1
     , warp                     >= 3.2    && < 3.3

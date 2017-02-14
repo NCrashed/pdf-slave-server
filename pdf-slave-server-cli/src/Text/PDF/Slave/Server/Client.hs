@@ -4,6 +4,7 @@ module Text.PDF.Slave.Server.Client(
   , runPDFSlaveClientM
   , renderTemplate
   , withAuth
+  , authGetToken
   , APIRenderId
   , fromAPIRenderId
   , toAPIRenderId
@@ -98,6 +99,12 @@ authSignout = do
   case mtoken of
     Nothing -> return ()
     Just token -> void . liftClientM $ authSignoutMethod (Just $ downgradeToken' token)
+
+-- | Get authorisation token of current session if any
+authGetToken :: PDFSlaveClientM (Maybe SimpleToken)
+authGetToken = do
+  PDFSlaveClientEnv{..} <- ask
+  fmap unToken <$> liftIO (readIORef envTokenRef)
 
 -- | Run given scope with authorisation
 withAuth :: Login -> Password -> Seconds -> PDFSlaveClientM a -> PDFSlaveClientM a

@@ -119,7 +119,7 @@ instance ToJSON APINotificationBody where
     ]
 
 -- | Signature of notification response.
-type Signature = ByteString
+type Signature = Text
 
 -- | Header that contains notification signature. Each notification is sended with
 -- the signature.

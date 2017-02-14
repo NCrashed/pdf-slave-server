@@ -160,21 +160,28 @@ runOptions Options{..} = case optionsCommand of
         Left e -> fail $ "Failed to parse input file: " <> e
         Right a -> return a
     -- Executing request
-    res <- runPDFSlaveClientM clientOptions $ withAuth optionsLogin optionsPassword optionsExpire $
-      renderTemplate template renderTemplateId templateInput
+    res <- runPDFSlaveClientM clientOptions $ withAuth optionsLogin optionsPassword optionsExpire $ do
+      mtok <- authGetToken
+      tok <- case mtok of
+        Nothing -> fail "Impossible: no auth token after authorisation"
+        Just tok -> return tok
+      res <- renderTemplate template renderTemplateId templateInput
+      return (tok, res)
     case res of
-      Left er -> putStrLn $ "Failed to put template in rendering queue: " <> show er
-      Right i -> do
+      Left er -> fail $ "Failed to put template in rendering queue: " <> show er
+      Right (tok, i) -> do
         putStrLn $ "Template is registered in rendering queue with id: " <> show i
         putStrLn $ "Awaiting notification..."
-        nt@APINotificationBody{..} <- waitNotification renderPort
+        mnotif <- waitNotification renderPort (unpack $ pdfSlaveReturnUrl clientOptions) tok
         putStrLn $ "Received notification."
-        case (apiNotificationError, apiNotificationDocument) of
-          (Just er, _) -> putStrLn $ "Failed to render template:\n" <> unpack er
-          (_, Just bs) -> do
-            putStrLn $ "Saving result to " <> show renderDocumentFile
-            BS.writeFile (unpack renderDocumentFile) bs
-          _ -> putStrLn $ "Received malformed notification body: " <> show nt
+        case mnotif of
+          Left er -> fail $ "Security check is failed: " <> er
+          Right nt@APINotificationBody{..} -> case (apiNotificationError, apiNotificationDocument) of
+            (Just er, _) -> putStrLn $ "Failed to render template:\n" <> unpack er
+            (_, Just bs) -> do
+              putStrLn $ "Saving result to " <> show renderDocumentFile
+              BS.writeFile (unpack renderDocumentFile) bs
+            _ -> putStrLn $ "Received malformed notification body: " <> show nt
     where
       clientOptions = PDFSlaveClientConfig {
           pdfSlaveUrl = optionsUrl
