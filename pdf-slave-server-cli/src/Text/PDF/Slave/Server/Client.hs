@@ -5,6 +5,10 @@ module Text.PDF.Slave.Server.Client(
   , renderTemplate
   , withAuth
   , authGetToken
+  , authSetToken
+  , authSignin
+  , authSignout
+  , authTouch
   , APIRenderId
   , fromAPIRenderId
   , toAPIRenderId
@@ -14,11 +18,12 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Aeson (Value)
-import Data.Aeson.WithField
 import Data.Aeson.Unit
+import Data.Aeson.WithField
 import Data.IORef
 import Data.Proxy
 import Data.Text (Text, unpack)
+import Data.Time
 import Network.HTTP.Client (Manager)
 import Network.HTTP.Client.TLS
 import Servant.API
@@ -85,11 +90,12 @@ renderTemplate t mid minput = do
   return i
 
 -- | Sign in the server and cache authentification token
-authSignin :: Login -> Password -> Seconds -> PDFSlaveClientM ()
+authSignin :: Login -> Password -> Seconds -> PDFSlaveClientM SimpleToken
 authSignin login password expire = do
   OnlyField token <- liftClientM $ authSigninMethod (Just login) (Just password) (Just expire)
   PDFSlaveClientEnv{..} <- ask
   liftIO $ writeIORef envTokenRef (Just $ Token token)
+  return token
 
 -- | Signouts from server
 authSignout :: PDFSlaveClientM ()
@@ -106,10 +112,27 @@ authGetToken = do
   PDFSlaveClientEnv{..} <- ask
   fmap unToken <$> liftIO (readIORef envTokenRef)
 
+-- | Save the given token as current session token
+authSetToken :: SimpleToken -> PDFSlaveClientM ()
+authSetToken token = do
+  PDFSlaveClientEnv{..} <- ask
+  liftIO $ writeIORef envTokenRef (Just $ Token token)
+
+-- | Prolong current token with given amount of time
+authTouch :: NominalDiffTime -> PDFSlaveClientM ()
+authTouch expire = do
+  PDFSlaveClientEnv{..} <- ask
+  mtoken <- liftIO $ readIORef envTokenRef
+  case mtoken of
+    Nothing -> return ()
+    Just token -> do
+      let seconds = ceiling (realToFrac expire :: Double)
+      void . liftClientM $ authTouchMethod (Just seconds) (Just $ downgradeToken' token)
+
 -- | Run given scope with authorisation
 withAuth :: Login -> Password -> Seconds -> PDFSlaveClientM a -> PDFSlaveClientM a
 withAuth login password expire m = do
-  authSignin login password expire
+  _ <- authSignin login password expire
   a <- m
   authSignout
   return a
@@ -118,11 +141,14 @@ withAuth login password expire m = do
 type ClientAPI = PDFSlaveAPI
   :<|> AuthSigninMethod
   :<|> AuthSignoutMethod
+  :<|> AuthTouchMethod
 
 renderTemplateEndpoint :: APIRenderBody -> MToken' '["render"] -> ClientM (OnlyId APIRenderId)
 authSigninMethod :: Maybe Login -> Maybe Password -> Maybe Seconds -> ClientM (OnlyField "token" SimpleToken)
 authSignoutMethod :: MToken' '[] -> ClientM Unit
+authTouchMethod :: Maybe Seconds -> MToken' '[] -> ClientM Unit
 (      renderTemplateEndpoint
   :<|> authSigninMethod
   :<|> authSignoutMethod
+  :<|> authTouchMethod
   ) = client (Proxy :: Proxy ClientAPI)
