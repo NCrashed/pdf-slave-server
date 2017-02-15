@@ -12,6 +12,7 @@ module Text.PDF.Slave.Server.Client(
   , APIRenderId
   , fromAPIRenderId
   , toAPIRenderId
+  , ServantError(..)
   ) where
 
 import Control.Monad.Catch
