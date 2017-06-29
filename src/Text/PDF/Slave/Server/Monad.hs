@@ -80,11 +80,11 @@ runAuth :: AuthM a -> ServerM a
 runAuth m = do
   cfg <- asks (serverAuthConfig . envConfig)
   db <- asks envDB
-  liftHandler $ ExceptT $ A.runAcidBackendT cfg db $ unAuthM m
+  liftHandler $ Handler . ExceptT $ A.runAcidBackendT cfg db $ unAuthM m
 
 -- | Transformation from 'AuthM' monad to 'ServerM'
 authToServerM :: AuthM :~> ServerM
-authToServerM = Nat runAuth
+authToServerM = NT runAuth
 
 -- | Create new server environment
 newServerEnv :: (MonadIO m, MonadBaseControl IO m)
@@ -133,14 +133,14 @@ runServerM e = runStdoutLoggingT . flip runReaderT e . unServerM
 -- | Execution of 'ServerM' in IO monad
 runServerMIO :: ServerEnv -> ServerM a -> IO a
 runServerMIO env m = do
-  ea <- runExceptT $ runServerM env m
+  ea <- runHandler $ runServerM env m
   case ea of
     Left e -> fail $ "runServerMIO: " <> show e
     Right a -> return a
 
 -- | Transformation to Servant 'Handler'
 serverMtoHandler :: ServerEnv -> ServerM :~> Handler
-serverMtoHandler e = Nat (runServerM e)
+serverMtoHandler e = NT (runServerM e)
 
 -- | Getting server configuration
 getConfig :: ServerM ServerConfig

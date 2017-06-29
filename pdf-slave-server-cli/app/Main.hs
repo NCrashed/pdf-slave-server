@@ -1,5 +1,6 @@
 module Main where
 
+import Data.Monoid 
 import Data.Text (pack, unpack, Text)
 import Data.UUID (UUID)
 import Data.Yaml (FromJSON, decodeEither')

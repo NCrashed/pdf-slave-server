@@ -16,7 +16,7 @@ import Data.Monoid
 import Data.Text                (Text, unpack, pack)
 import Data.Text.Encoding       (encodeUtf8)
 import GHC.Generics             (Generic)
-import Network.HTTP.Client      (HttpException (..), Manager)
+import Network.HTTP.Client      (HttpException (..), Manager, HttpExceptionContent(..))
 import Network.Wreq
 import Servant.API.Auth.Token
 
@@ -44,8 +44,7 @@ data NotificationError =
 toNotificationError :: HttpException -> NotificationError
 toNotificationError e = case e of
     InvalidUrlException s1 s2 -> BadBaseUrl (s1 <> " : " <> s2)
-    TooManyRedirects _        -> HasRedirectError
-    UnparseableRedirect _     -> HasRedirectError
+    HttpExceptionRequest _ TooManyRedirects{} -> HasRedirectError
     _                         -> NotificationFail e
 
 -- | Send notification to remote server.
