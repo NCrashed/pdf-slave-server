@@ -1,6 +1,9 @@
 module Main where
 
-import Data.Monoid 
+import Control.Lens
+import Data.Monoid
+import Data.String
+import Data.Text (unpack)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.RequestLogger
 import Options.Applicative
@@ -28,7 +31,12 @@ runServer Options{..} = do
   cfg <- readConfig configPath
   env <- newServerEnv cfg
   let logger = makeLogger $ serverDetailedLogging cfg
-  run (serverPort cfg) $ logger $ pdfSlaveServerApp env
+      port = serverPort cfg
+      host = fromString . unpack $ serverHost cfg :: HostPreference
+      settings = defaultSettings
+        & setHost host
+        & setPort port
+  runSettings settings $ logger $ pdfSlaveServerApp env
   where
     makeLogger b = if b
       then logStdoutDev

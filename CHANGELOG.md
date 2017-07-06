@@ -1,3 +1,8 @@
+0.1.2.0
+=======
+
+* Feature to bind to network interface.
+
 0.1.1.0
 =======
 

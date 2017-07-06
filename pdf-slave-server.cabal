@@ -1,5 +1,5 @@
 name:                pdf-slave-server
-version:             0.1.1.0
+version:             0.1.2.0
 synopsis:            Web service for pdf-slave tool
 description:         Please see README.md
 homepage:            https://github.com/NCrashed/pdf-slave-server#readme
@@ -91,8 +91,10 @@ executable pdf-slave-server
   default-language:    Haskell2010
   build-depends:
       base                          >= 4.7       && < 5
+    , lens                          >= 4.14     && < 4.16
     , optparse-applicative          >= 0.12      && < 0.14
     , pdf-slave-server
+    , text                          >= 1.2      && < 1.3
     , wai-extra                     >= 3.0       && < 3.1
     , warp                          >= 3.2       && < 3.3
   default-extensions:
